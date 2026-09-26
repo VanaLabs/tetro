@@ -23,7 +23,7 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
-        .tooltip(if crate::app_profile::is_development() { "Tetro Dev" } else { "Tetro" })
+        .tooltip("Tetro")
         .icon(tauri::image::Image::new(include_bytes!("../icons/letter/idle.rgba"), 36, 36))
         .icon_as_template(true)
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))

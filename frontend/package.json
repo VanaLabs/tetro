@@ -7,7 +7,6 @@
         "build": "next build",
         "start": "next start -p 3118",
         "tauri": "tauri",
-        "tauri:dev": "node scripts/dev-desktop.mjs",
         "tauri:build": "node scripts/tauri-auto.js build",
         "tauri:dev:cpu": "tauri dev",
         "tauri:dev:cuda": "tauri dev -- --features cuda",
@@ -25,8 +24,6 @@
         "tauri:build:hipblas": "tauri build -- --features hipblas",
         "lint": "eslint src",
         "test:transcription-routing": "node tests/lib/transcription-language-routing.test.mjs",
-        "dev:tetro-web": "next dev -H 127.0.0.1 -p 3119",
-        "dev:desktop": "node scripts/dev-desktop.mjs",
         "test": "node scripts/test-isolated.mjs",
         "typecheck": "tsc --noEmit"
     },

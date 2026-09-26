@@ -113,7 +113,7 @@ export default function RootLayout({
 
         if (!isComplete) {
           console.log('[Layout] Onboarding not completed, showing onboarding flow')
-          setShowOnboarding(process.env.NEXT_PUBLIC_TETRO_DEV !== '1')
+          setShowOnboarding(true)
         } else {
           console.log('[Layout] Onboarding completed, showing main app')
         }
@@ -121,7 +121,7 @@ export default function RootLayout({
       .catch((error) => {
         console.error('[Layout] Failed to check onboarding status:', error)
         // Default to showing onboarding if we can't check
-        setShowOnboarding(process.env.NEXT_PUBLIC_TETRO_DEV !== '1')
+        setShowOnboarding(true)
         setOnboardingCompleted(false)
       })
   }, [])

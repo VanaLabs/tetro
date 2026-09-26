@@ -92,9 +92,6 @@ fn remember_name_format(p: &RecordingPreferences) {
 
 /// Get the default recordings folder based on platform
 pub fn get_default_recordings_folder() -> PathBuf {
-    if crate::app_profile::is_development() {
-        return crate::app_profile::data_dir().expect("Tetro development data directory").join("recordings");
-    }
     #[cfg(target_os = "windows")]
     {
         // Windows: %USERPROFILE%\Music\tetro-recordings
@@ -441,4 +438,3 @@ pub async fn get_audio_backend_info() -> Result<Vec<BackendInfo>, String> {
         }])
     }
 }
-

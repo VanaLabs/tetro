@@ -20,6 +20,8 @@ pub struct OnboardingStatus {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ModelStatus {
     pub parakeet: String,  // "downloaded" | "not_downloaded" | "downloading"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transcription: Option<String>,
     pub summary: String,   // Generic field for summary model (Qwen 3.5 or legacy Gemma variants)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_summary_model: Option<String>,
@@ -33,6 +35,7 @@ impl Default for OnboardingStatus {
             current_step: 1,
             model_status: ModelStatus {
                 parakeet: "not_downloaded".to_string(),
+                transcription: None,
                 summary: "not_downloaded".to_string(),  // Changed from gemma
                 selected_summary_model: None,
             },
@@ -87,6 +90,15 @@ pub async fn save_onboarding_status<R: Runtime>(
     // Get or create store
     let store = app.store("onboarding-status.json")
         .map_err(|e| anyhow::anyhow!("Failed to access onboarding store: {}", e))?;
+
+    // A delayed progress save must never reopen setup after completion.
+    if !status.completed && store.get("status")
+        .and_then(|value| serde_json::from_value::<OnboardingStatus>(value.clone()).ok())
+        .is_some_and(|previous| previous.completed)
+    {
+        warn!("Ignoring stale incomplete onboarding status after completion");
+        return Ok(());
+    }
 
     // Update last_updated timestamp
     let mut status = status.clone();
@@ -172,8 +184,17 @@ pub async fn complete_onboarding<R: Runtime>(
     app: AppHandle<R>,
     state: tauri::State<'_, AppState>,
     model: String,
+    summary_ready: bool,
 ) -> Result<(), String> {
     info!("Completing onboarding with builtin-ai model: {}", model);
+
+    crate::whisper_engine::commands::whisper_init().await?;
+    let tiny_ready = crate::whisper_engine::commands::whisper_get_available_models().await?
+        .into_iter()
+        .any(|entry| entry.name == "tiny" && matches!(entry.status, crate::whisper_engine::ModelStatus::Available));
+    if !tiny_ready {
+        return Err("Whisper Tiny must be ready before completing setup".to_string());
+    }
 
     // Step 1: Save model configuration to SQLite database FIRST
     let pool = state.db_manager.pool();
@@ -183,7 +204,7 @@ pub async fn complete_onboarding<R: Runtime>(
         pool,
         "builtin-ai",
         &model,
-        "large-v3",
+        "tiny",
         None,
     ).await {
         error!("Failed to save builtin-ai model config: {}", e);
@@ -191,16 +212,16 @@ pub async fn complete_onboarding<R: Runtime>(
     }
     info!("Saved builtin-ai model config: model={}", model);
 
-    // Save transcription model config (parakeet provider) - always parakeet
+    // Use the bundled small speech model until the person chooses another one.
     if let Err(e) = SettingsRepository::save_transcript_config(
         pool,
-        "parakeet",
-        crate::config::DEFAULT_PARAKEET_MODEL,
+        "localWhisper",
+        "tiny",
     ).await {
         error!("Failed to save transcription model config: {}", e);
         return Err(format!("Failed to save transcription model config: {}", e));
     }
-    info!("Saved transcription model config: provider=parakeet, model={}", crate::config::DEFAULT_PARAKEET_MODEL);
+    info!("Saved transcription model config: provider=localWhisper, model=tiny");
 
     // Step 2: Only NOW mark onboarding as complete (after DB operations succeed)
     let mut status = load_onboarding_status(&app)
@@ -209,8 +230,8 @@ pub async fn complete_onboarding<R: Runtime>(
 
     status.completed = true;
     status.current_step = 4; // Max step (4 on macOS with permissions, 3 on other platforms)
-    status.model_status.parakeet = "downloaded".to_string();
-    status.model_status.summary = "downloaded".to_string();
+    status.model_status.transcription = Some("downloaded".to_string());
+    status.model_status.summary = if summary_ready { "downloaded" } else { "not_downloaded" }.to_string();
     status.model_status.selected_summary_model = Some(model.clone());
 
     save_onboarding_status(&app, &status)
@@ -242,5 +263,6 @@ mod tests {
         .expect("old onboarding status should remain compatible");
 
         assert_eq!(status.model_status.selected_summary_model, None);
+        assert_eq!(status.model_status.transcription, None);
     }
 }

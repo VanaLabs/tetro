@@ -11,7 +11,7 @@ export function WelcomeStep() {
   const features = [
     {
       icon: Lock,
-      title: 'Your data never leaves your device',
+      title: 'Recordings and notes are stored on your device',
     },
     {
       icon: Sparkles,
@@ -19,14 +19,14 @@ export function WelcomeStep() {
     },
     {
       icon: Cpu,
-      title: 'Works offline, no cloud required',
+      title: 'Local models work offline after setup',
     },
   ];
 
   return (
     <OnboardingContainer
       title="Welcome to Tetro"
-      description="Record. Transcribe. Summarize. All on your device."
+      description="Record and transcribe locally. Choose how you make notes."
       step={1}
       hideProgress={true}
     >
@@ -58,7 +58,7 @@ export function WelcomeStep() {
           >
             Get Started
           </Button>
-          <p className="text-xs text-center text-gray-500">Takes less than 3 minutes</p>
+          <p className="text-xs text-center text-gray-500">Models only download when you choose them.</p>
         </div>
       </div>
     </OnboardingContainer>

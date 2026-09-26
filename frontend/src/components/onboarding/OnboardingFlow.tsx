@@ -31,10 +31,9 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     checkPlatform();
   }, []);
 
-  // 4-Step Onboarding Flow (System-Recommended Models):
-  // Step 1: Welcome - Introduce Meetily features
-  // Step 2: Setup Overview - Database initialization + show recommended downloads
-  // Step 3: Download Progress - Download Parakeet + Summary Model (auto-selected based on platform/RAM)
+  // Step 1: Welcome
+  // Step 2: Explain the starter models
+  // Step 3: Offer the smallest models without starting a download
   // Step 4: Permissions - Request mic + system audio (macOS only)
 
   return (

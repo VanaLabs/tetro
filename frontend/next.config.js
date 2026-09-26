@@ -7,7 +7,7 @@ const resolveFromTiptapPm = (pkg) =>
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  distDir: process.env.NEXT_PUBLIC_TETRO_DEV === '1' ? '.next-tetro-dev' : '.next',
+  distDir: '.next',
   devIndicators: false,
   reactStrictMode: false, // Disabled for BlockNote compatibility
   output: 'export',

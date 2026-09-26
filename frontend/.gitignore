@@ -52,5 +52,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Live desktop development output
-.next-tetro-dev/
+# Generated native schemas
+src-tauri/gen/

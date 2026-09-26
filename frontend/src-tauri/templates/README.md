@@ -75,9 +75,8 @@ Each template JSON file follows this schema:
 
 Users can add custom templates to the application data directory:
 
-- **macOS**: `~/Library/Application Support/Meetily/templates/`
-- **Windows**: `%APPDATA%\Meetily\templates\`
-- **Linux**: `~/.config/Meetily/templates/`
+- **macOS**: `~/Library/Application Support/am.vanalabs.tetro/templates/`
+- **Windows and Linux**: the `templates` folder in Tetro's application data directory
 
 Custom templates override built-in templates with the same filename.
 

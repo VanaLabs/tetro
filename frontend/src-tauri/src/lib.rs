@@ -548,8 +548,6 @@ pub fn run() {
         .setup(|_app| {
             app_profile::initialize(_app.handle())?;
             app_menu::install(_app)?;
-            #[cfg(debug_assertions)]
-            app_profile::add_development_menu(_app)?;
             #[cfg(not(target_os = "windows"))]
             if let Err(error) = catch_onnx_runtime_init(|| {
                 ort::init().with_telemetry(false).commit().map(|_| ())
@@ -602,13 +600,11 @@ pub fn run() {
                 match notifications::commands::initialize_notification_manager(app_for_notif.clone()).await {
                     Ok(manager) => {
                         // Set default consent and permissions on first launch
-                        if let Err(e) = manager.set_consent(!app_profile::is_development()).await {
+                        if let Err(e) = manager.set_consent(true).await {
                             log::error!("Failed to set initial consent: {}", e);
                         }
-                        if !app_profile::is_development() {
-                            if let Err(e) = manager.request_permission().await {
-                                log::error!("Failed to request initial permission: {}", e);
-                            }
+                        if let Err(e) = manager.request_permission().await {
+                            log::error!("Failed to request initial permission: {}", e);
                         }
 
                         // Store the initialized manager

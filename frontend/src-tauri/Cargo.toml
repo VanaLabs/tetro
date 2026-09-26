@@ -1,5 +1,5 @@
 [package]
-name = "meetily"
+name = "tetro"
 version = "0.4.1"
 description = "Tetro desktop meeting recorder, transcription and notes"
 authors = ["Sujith S", "Sedrak Hovhannisyan"]

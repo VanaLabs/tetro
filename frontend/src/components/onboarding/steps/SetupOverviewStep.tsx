@@ -1,14 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Info } from 'lucide-react';
+import { Mic, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OnboardingContainer } from '../OnboardingContainer';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 export function SetupOverviewStep() {
   const { goNext } = useOnboarding();
@@ -19,83 +13,40 @@ export function SetupOverviewStep() {
       try {
         const { platform } = await import('@tauri-apps/plugin-os');
         setIsMac(platform() === 'macos');
-      } catch (e) {
+      } catch {
         setIsMac(navigator.userAgent.includes('Mac'));
       }
     };
-    checkPlatform();
+    void checkPlatform();
   }, []);
-
-  const steps = [
-    {
-      number: 1,
-      type: 'transcription',
-      title: 'Download Transcription Engine',
-    },
-    {
-      number: 2,
-      type: 'summarization',
-      title: 'Download Summarization Engine',
-    },
-  ];
-
-  const handleContinue = () => {
-    goNext();
-  };
 
   return (
     <OnboardingContainer
-      title="Setup Overview"
-      description="Tetro requires that you download the Transcription & Summarization AI models for the software to work."
+      title="Set up local models"
+      description="Start with the smallest speech model. Local AI notes are optional."
       step={2}
       totalSteps={isMac ? 4 : 3}
     >
-      <div className="flex flex-col items-center space-y-10">
-        {/* Steps Card */}
-        <div className="w-full max-w-md bg-white rounded-lg border border-gray-200 p-4">
-          <div className="space-y-4">
-            {steps.map((step, idx) => {
-              return (
-                <div
-                  key={step.number}
-                  className={`flex items-start gap-4 p-1`}
-                >
-                  <div className="flex-1 ml-1">
-                    <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                        Step {step.number} :  {step.title}
-
-                        {step.type === "summarization" && (
-                            <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                <button className="text-gray-400 hover:text-gray-600">
-                                    <Info className="w-4 h-4" />
-                                </button>
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs text-sm">
-                                You can also select external AI providers like OpenAI, Claude, or
-                                Ollama for summary generation in settings.
-                                </TooltipContent>
-                            </Tooltip>
-                            </TooltipProvider>
-                        )}
-                        </h3>
-                  </div>
-                </div>
-              );
-            })}
+      <div className="mx-auto w-full max-w-md space-y-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex items-start gap-3">
+            <Mic className="mt-0.5 h-5 w-5 text-gray-700" aria-hidden="true" />
+            <div>
+              <h2 className="font-semibold text-gray-900">Transcription · about 74 MiB</h2>
+              <p className="mt-1 text-sm text-gray-600">Whisper Tiny is included with the desktop app. It is fast but less accurate than larger models. If it is missing, Tetro will ask before downloading it.</p>
+            </div>
           </div>
         </div>
-
-        {/* CTA Section */}
-        <div className="w-full max-w-xs space-y-4">
-          <Button
-            onClick={handleContinue}
-            className="w-full h-11 tetro-key tetro-key-amber"
-          >
-            Let&apos;s Go
-          </Button>
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="flex items-start gap-3">
+            <Sparkles className="mt-0.5 h-5 w-5 text-gray-700" aria-hidden="true" />
+            <div>
+              <h2 className="font-semibold text-gray-900">Local notes · about 1.0 GiB</h2>
+              <p className="mt-1 text-sm text-gray-600">Choose whether to download Gemma 3 1B now. You can record and edit transcripts without it.</p>
+            </div>
+          </div>
         </div>
+        <Button onClick={goNext} className="w-full tetro-key tetro-key-amber">Choose models</Button>
       </div>
     </OnboardingContainer>
   );

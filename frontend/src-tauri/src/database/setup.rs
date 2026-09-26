@@ -12,7 +12,7 @@ pub async fn initialize_database_on_startup(app: &AppHandle) -> Result<(), Strin
         .await
         .map_err(|e| format!("Failed to check first launch status: {}", e))?;
 
-    if is_first_launch && !crate::app_profile::is_development() {
+    if is_first_launch {
         info!("First launch detected - will notify window when ready");
 
         // Delay event emission to ensure window is ready and React listeners are registered

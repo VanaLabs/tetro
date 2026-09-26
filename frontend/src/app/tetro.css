@@ -197,8 +197,6 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 .tetro-header h1 { font-weight:600; font-size:19px; letter-spacing:-.01em; line-height:1.2; color:var(--tetro-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .tetro-header time { color:var(--tetro-faint); font-size:11px; white-space:nowrap; font-family:var(--font-tetro-mono),monospace; margin-top:2px; }
 .tetro-header-spacer { flex:1; }
-.tetro-dev-badge { display:inline-flex; align-items:center; gap:6px; color:var(--tetro-muted); font-family:var(--font-tetro-mono),monospace; font-size:10.5px; white-space:nowrap; }
-.tetro-dev-badge::before { content:''; width:5px; height:5px; border-radius:50%; background:#3fa36b; box-shadow:0 0 4px #3fa36b; }
 .tetro-recording-status { display:inline-flex; align-items:center; gap:6px; color:var(--tetro-red); white-space:nowrap; font-weight:500; font-size:12px; }
 .tetro-recording-status::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--tetro-red); animation:tetro-lamp 1.4s ease-in-out infinite; }
 .tetro-content { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }

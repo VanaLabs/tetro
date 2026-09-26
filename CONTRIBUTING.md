@@ -1,8 +1,7 @@
 # Contributing to Tetro
 
-Thanks for helping improve Tetro. The project started from
-[Meetily Community Edition](https://github.com/Zackriya-Solutions/meeting-minutes),
-and its original copyright notice remains in `LICENSE.md`.
+Thanks for helping improve Tetro. Retain the copyright and license notices in
+`LICENSE.md`.
 
 ## Before you send a change
 
@@ -16,10 +15,6 @@ and its original copyright notice remains in `LICENSE.md`.
   `cargo test --lib --manifest-path frontend/src-tauri/Cargo.toml` from the
   repository root. Describe any checks you could not run.
 - Update the help text or README when a user-facing behavior changes.
-
-The isolated macOS development app and its setup are described in
-[`docs/TETRO-DEVELOPMENT.md`](docs/TETRO-DEVELOPMENT.md). It uses a separate
-profile from an installed Meetily app.
 
 ## Source and identity
 

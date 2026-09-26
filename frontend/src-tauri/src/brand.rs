@@ -147,7 +147,7 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let mode = visual_mode(mode_from(BACKEND.load(Ordering::SeqCst)), FRONTEND_BUSY.load(Ordering::SeqCst));
     let reduced = REDUCE_MOTION.load(Ordering::SeqCst);
-    let name = if crate::app_profile::is_development() { "Tetro Dev" } else { "Tetro" };
+    let name = "Tetro";
     let status = match mode { Mode::Idle if crate::call_detection::call_active() => "Microphone in use · Record this call", Mode::Idle => "Ready", Mode::Starting => "Starting recording", Mode::Recording => "Recording", Mode::Paused => "Recording paused", Mode::Working => "Processing recording" };
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(format!("{name} · {status}")));

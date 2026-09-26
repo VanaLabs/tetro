@@ -22,7 +22,7 @@ export function About() {
   return <div className="tetro-about">
     <Segmented label="About Tetro" value={tab} onChange={setTab} options={[{ value: 'about', label: 'About' }, { value: 'privacy', label: 'Privacy' }, { value: 'licenses', label: 'Licenses' }]} />
     <div className="tetro-about-body" role="tabpanel" aria-label={tab === 'about' ? 'About' : tab === 'privacy' ? 'Privacy' : 'Licenses'}>{tab === 'about' ? <>
-      <div className="tetro-about-identity"><h2 aria-label="Tetro"><TetroLiveBrand variant="about" /></h2><p>Vana Labs · {version ? `v${version}` : '…'}{process.env.NEXT_PUBLIC_TETRO_DEV === '1' ? ' · Dev' : ''}</p></div>
+      <div className="tetro-about-identity"><h2 aria-label="Tetro"><TetroLiveBrand variant="about" /></h2><p>Vana Labs · {version ? `v${version}` : '…'}</p></div>
       <p>Record a conversation, read the transcript and turn it into editable notes and action items.</p><p>Built-in models work on this device after download. You can also connect a notes provider in Settings → Models. Check transcripts and generated notes before relying on or sharing them.</p>
       <div className="tetro-dialog-actions"><button onClick={() => void invoke('open_external_url', { url: 'https://vanalabs.am' }).catch(e => toast.error(String(e)))}>Vana Labs</button><button onClick={() => setTab('licenses')}>Open-source licenses</button></div>
     </> : tab === 'privacy' ? <dl className="tetro-privacy">{PRIVACY.map(([term, text]) => <div key={term}><dt>{term}</dt><dd>{text}</dd></div>)}</dl>
