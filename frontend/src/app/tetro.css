@@ -956,6 +956,7 @@ button.tetro-stamp:hover { color:var(--tetro-accent); }
 .tetro-guide { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(230px,.8fr); align-content:start; align-items:start; border:1px solid var(--tetro-line); border-radius:12px; overflow:hidden; background:var(--tetro-paper); }
 .tetro-guide-image { grid-column:1; grid-row:2 / 5; width:min(100%,calc((100dvh - 250px) * 110 / 69)); position:relative; overflow:hidden; aspect-ratio:110 / 69; background:var(--tetro-desk); }
 .tetro-guide-frame { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity .55s ease-in-out; }
+.tetro-guide-frame:first-child { opacity:1; }
 .tetro-guide-frame.is-visible { opacity:1; }
 .tetro-guide-caption { grid-column:2; display:flex; flex-direction:column; gap:10px; align-items:flex-start; min-height:76px; padding:20px 20px 12px; font-size:13px; }
 .tetro-guide-step { white-space:nowrap; color:var(--tetro-muted); font:11px var(--font-tetro-mono); }
