@@ -1,0 +1,286 @@
+import { useEffect } from 'react';
+import { Switch } from '@/components/ui/switch';
+import { ModelConfig } from "@/components/ModelSettingsModal";
+import { PreferenceSettings } from "@/components/PreferenceSettings";
+import { DeviceSelection } from "@/components/DeviceSelection";
+import { LanguageSelection } from "@/components/LanguageSelection";
+import { ModelPicker } from '@/components/tetro/ModelPicker';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useConfig } from "@/contexts/ConfigContext";
+import { useRecordingState } from "@/contexts/RecordingStateContext";
+
+type modalType = "modelSettings" | "deviceSettings" | "languageSettings" | "modelSelector" | "errorAlert" | "chunkDropWarning";
+
+/**
+ * SettingsModals Component
+ *
+ * All settings modals consolidated into a single component.
+ * Uses ConfigContext and RecordingStateContext internally - no prop drilling needed!
+ */
+
+interface SettingsModalsProps {
+  modals: {
+    modelSettings: boolean;
+    deviceSettings: boolean;
+    languageSettings: boolean;
+    modelSelector: boolean;
+    errorAlert: boolean;
+    chunkDropWarning: boolean;
+  };
+  messages: {
+    errorAlert: string;
+    chunkDropWarning: string;
+    modelSelector: string;
+  };
+  onClose: (name: modalType) => void;
+}
+
+export function SettingsModals({
+  modals,
+  messages,
+  onClose,
+}: SettingsModalsProps) {
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const open = (Object.keys(modals) as modalType[]).find(key => modals[key]);
+      if (open) onClose(open);
+    };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [modals, onClose]);
+  // Contexts
+  const {
+    modelConfig,
+    setModelConfig,
+    models,
+    modelOptions,
+    error,
+    selectedDevices,
+    setSelectedDevices,
+    selectedLanguage,
+    transcriptModelConfig,
+    setTranscriptModelConfig,
+    showConfidenceIndicator,
+    toggleConfidenceIndicator,
+  } = useConfig();
+
+  const { isRecording } = useRecordingState();
+
+  return <>
+    {/* Legacy Settings Modal */}
+    {modals.modelSettings && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="flex justify-between items-center p-6 border-b">
+            <h3 className="text-xl font-semibold text-gray-900">Preferences</h3>
+            <button
+              onClick={() => onClose("modelSettings")
+              }
+              className="tetro-icon" aria-label="Close" title="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Content - Scrollable */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* General Preferences Section */}
+            <PreferenceSettings />
+
+            {/* Divider */}
+            <div className="border-t pt-8">
+              <h4 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Summarization Model
+                  </label>
+                  <div className="flex space-x-2">
+                    <select
+                      className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={modelConfig.provider}
+                      onChange={(e) => {
+                        const provider = e.target.value as ModelConfig['provider'];
+                        setModelConfig({
+                          ...modelConfig,
+                          provider,
+                          model: modelOptions[provider][0]
+                        });
+                      }}
+                    >
+                      <option value="builtin-ai">Built-in AI</option>
+                      <option value="claude">Claude</option>
+                      <option value="groq">Groq</option>
+                      <option value="ollama">Ollama</option>
+                      <option value="openrouter">OpenRouter</option>
+                      <option value="openai">OpenAI</option>
+                    </select>
+
+                    <select
+                      className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      value={modelConfig.model}
+                      onChange={(e) => setModelConfig((prev: ModelConfig) => ({ ...prev, model: e.target.value }))}
+                    >
+                      {modelOptions[modelConfig.provider].map((model: string) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {modelConfig.provider === 'ollama' && (
+                  <div>
+                    <h4 className="text-lg font-bold mb-4">Available Ollama Models</h4>
+                    {error && (
+                      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                        {error}
+                      </div>
+                    )}
+                    <div className="grid gap-4 max-h-[400px] overflow-y-auto pr-2">
+                      {models.map((model) => (
+                        <div
+                          key={model.id}
+                          className={`bg-white p-4 rounded-lg shadow cursor-pointer transition-colors ${modelConfig.model === model.name ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                            }`}
+                          onClick={() => setModelConfig((prev: ModelConfig) => ({ ...prev, model: model.name }))}
+                        >
+                          <h3 className="font-bold">{model.name}</h3>
+                          <p className="text-gray-600">Size: {model.size}</p>
+                          <p className="text-gray-600">Modified: {model.modified}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t p-6 flex justify-end">
+            <button
+              onClick={() => onClose('modelSettings')}
+              className="tetro-key tetro-key-amber"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Device Settings Modal */}
+    {modals.deviceSettings && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Audio Device Settings</h3>
+            <button
+              onClick={() => onClose('deviceSettings')}
+              className="tetro-icon" aria-label="Close" title="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <DeviceSelection
+            selectedDevices={selectedDevices}
+            onDeviceChange={setSelectedDevices}
+            disabled={isRecording}
+          />
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={() => {
+                onClose('deviceSettings');
+              }}
+              className="tetro-key tetro-key-amber"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Language Settings Modal */}
+    {modals.languageSettings && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Transcription language</h3>
+            <button
+              onClick={() => onClose('languageSettings')}
+              className="tetro-icon" aria-label="Close" title="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <LanguageSelection
+            selectedLanguage={selectedLanguage}
+            disabled={isRecording}
+            provider={transcriptModelConfig.provider}
+          />
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={() => onClose('languageSettings')}
+              className="tetro-key tetro-key-amber"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    <ModelPicker purpose="transcription" presentation="dialog" open={modals.modelSelector}
+      onOpenChange={open => { if (!open) onClose('modelSelector'); }} message={messages.modelSelector} />
+
+    {/* Error Alert Modal */}
+    {modals.errorAlert && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <Alert className="max-w-md mx-4 border-red-200 bg-white shadow-xl">
+          <AlertTitle className="text-red-800">Recording Stopped</AlertTitle>
+          <AlertDescription className="text-red-700">
+            {messages.errorAlert}
+            <button
+              onClick={() => onClose('errorAlert')}
+              className="ml-2 text-red-600 hover:text-red-800 underline"
+            >
+              Dismiss
+            </button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )}
+
+    {/* Chunk Drop Warning Modal */}
+    {modals.chunkDropWarning && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <Alert className="max-w-lg mx-4 border-yellow-200 bg-white shadow-xl">
+          <AlertTitle className="text-yellow-800">Transcription Performance Warning</AlertTitle>
+          <AlertDescription className="text-yellow-700">
+            {messages.chunkDropWarning}
+            <button
+              onClick={() => onClose('chunkDropWarning')}
+              className="ml-2 text-yellow-600 hover:text-yellow-800 underline"
+            >
+              Dismiss
+            </button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )}
+  </>
+}

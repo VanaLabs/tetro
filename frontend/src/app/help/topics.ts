@@ -1,0 +1,57 @@
+export type GuideFrame = { image: string; label: string };
+export type GuideStep = { title: string; text: string; image: string; sequence?: GuideFrame[] };
+export type GuideTopic = { title: string; intro: string; steps: GuideStep[] };
+export const GUIDE_TOPICS: GuideTopic[] = [
+  { title: 'Record', intro: 'Capture your microphone and computer sound together. Tell everyone before recording.', steps: [
+    { title: 'Choose your audio devices', text: 'Open New recording, then Audio. Choose the microphone you will speak into and the device playing the call. Refresh the list if you just connected a headset. The sound meters become active when recording starts.', image: 'audio-devices.jpg' },
+    { title: 'Choose the spoken language', text: 'The language here is what people will speak. Detect automatically is useful for mixed languages. Choose a model that supports the language; the model picker explains the available choices.', image: 'recording-ready.jpg' },
+    { title: 'Begin the recording', text: 'Choose Start recording. Check that the microphone and computer-sound meters move when there is sound. The transcript appears as speech is processed; a short delay is normal, especially with a larger model.', image: 'recording-ready.jpg', sequence: [{ image: 'recording-ready.jpg', label: 'Ready to record' }, { image: 'recording-live.jpg', label: 'Recording in progress' }] },
+    { title: 'Pause without ending the meeting', text: 'Pause stops capturing sound. Resume continues the same meeting. The timer and recording controls show whether you are recording or paused.', image: 'recording-live.jpg' },
+    { title: 'Mark a moment worth returning to', text: 'Choose Highlight when a decision, question or useful detail comes up. The saved moment helps you find that part of the conversation later.', image: 'recording-live.jpg' },
+    { title: 'Stop and let Tetro finish saving', text: 'Choose Stop. Tetro finishes the remaining transcript and opens the saved meeting. Keep the app open until saving finishes. Save audio in Settings → Recordings controls whether an audio file is kept.', image: 'recording-live.jpg' },
+  ] },
+  { title: 'Import', intro: 'Turn an existing audio or video file into a meeting. Video files use their audio track.', steps: [
+    { title: 'Choose a file', text: 'Use the import button beside New recording, or Command/Ctrl + O. Choose a supported file from your computer. The dialog shows its duration and size before you start.', image: 'import-options.jpg' },
+    { title: 'Give the meeting a useful name', text: 'Replace the filename with something you will recognize in the meeting list. Advanced Options lets you choose the spoken language and transcription model for this import.', image: 'import-options.jpg' },
+    { title: 'Import and follow progress', text: 'Choose Import. Tetro finds speech and turns it into text. A longer recording or larger model takes more time. Stop transcribing cancels the job if you need to change your choice.', image: 'import-options.jpg' },
+    { title: 'Review the result', text: 'The saved meeting opens when import finishes. Listen to the recording while checking names, numbers and important details. Then write notes from the transcript.', image: 'meeting-ready.jpg' },
+  ] },
+  { title: 'Read & correct', intro: 'Your transcript and saved recording stay together. Corrections are saved to the meeting.', steps: [
+    { title: 'Listen to the original', text: 'Play starts the saved recording. Use the timeline to seek, the arrow buttons to move ten seconds, or the speed button to change playback speed. A transcript timestamp plays from that point.', image: 'meeting-ready.jpg' },
+    { title: 'Correct a line', text: 'Double-click a transcript line or use its pencil button. Fix the text, then Save or press Enter. Shift + Enter adds a new line; Cancel leaves the text as it was.', image: 'transcript-edit.jpg' },
+    { title: 'Keep a useful spelling', text: 'After a word correction, Tetro may offer to add it to Names & terms. You can also add terms in Settings → Transcription. Whisper and notes models use these as hints, so still check the output.', image: 'transcript-edit.jpg' },
+    { title: 'Try transcription again when needed', text: 'Retranscribe uses the saved audio with another language or model. Your edits and highlighted moments are preserved. Previous versions lets you inspect earlier transcript text.', image: 'meeting-ready.jpg' },
+    { title: 'Use the view that fits', text: 'Side by side shows transcript and notes together. Turn it off to read one view at a time. Hide the meeting list for more room, or drag the divider to adjust the two panels.', image: 'meeting-ready.jpg' },
+  ] },
+  { title: 'Write notes', intro: 'A template gives the notes their structure; the notes model writes the first draft.', steps: [
+    { title: 'Choose the right structure', text: 'Pick a template beside Write notes: general meeting notes, a standup, a plan, or one you created. The template tells Tetro which sections to include.', image: 'meeting-ready.jpg' },
+    { title: 'Set language and instructions', text: 'Open More for Notes language, Summary model and Instructions. The notes language can differ from the spoken language. Instructions can ask for a particular tone or focus.', image: 'notes-menu.jpg', sequence: [{ image: 'meeting-ready.jpg', label: 'Meeting ready' }, { image: 'notes-menu.jpg', label: 'Notes options open' }] },
+    { title: 'Write the draft', text: 'Choose Write notes, or Write again for an existing summary. Stop summarizing cancels the current job. A built-in model runs here; a connected provider receives the transcript and instructions.', image: 'meeting-ready.jpg', sequence: [{ image: 'meeting-ready.jpg', label: 'Before writing notes' }, { image: 'meeting-notes.jpg', label: 'Notes ready for review' }] },
+    { title: 'Review and save your edits', text: 'Click in the notes to edit, then choose Save summary. Check decisions, people, dates and amounts against the transcript: a model can miss or invent details. Saved corrections are kept when you write again.', image: 'meeting-notes.jpg' },
+    { title: 'Copy or export', text: 'More includes Copy notes, PDF and Markdown. Choose the option with transcript when you want the source text included. PDF opens a print preview; choose Save as PDF in the system print dialog.', image: 'notes-menu.jpg' },
+  ] },
+  { title: 'Templates', intro: 'Templates define what notes should contain. The examples show the layout using fictional content.', steps: [
+    { title: 'Explore the built-in templates', text: 'Open Templates and select a meeting type. Read its example notes, then expand Template instructions to see what Tetro will ask the model to write.', image: 'templates.jpg' },
+    { title: 'Describe your own template', text: 'Choose New template and describe the meeting, what matters, and the sections you want. Draft template uses your selected notes model. Start from scratch opens a blank editor without using a model.', image: 'template-prompt.jpg', sequence: [{ image: 'templates.jpg', label: 'Template library' }, { image: 'template-prompt.jpg', label: 'New template prompt' }] },
+    { title: 'Review before saving', text: 'Give the template a clear name. Check each section’s title, instructions and format. You can reorder, add or remove sections. Save when the structure matches what you need.', image: 'template-editor.jpg', sequence: [{ image: 'template-prompt.jpg', label: 'Draft template' }, { image: 'template-editor.jpg', label: 'Review the sections' }] },
+    { title: 'Reuse and share', text: 'Your saved template appears in the template picker on every meeting. Duplicate makes a separate copy. Export saves a JSON template file; Import adds a compatible file someone has shared with you.', image: 'templates.jpg' },
+  ] },
+  { title: 'Models & privacy', intro: 'A model is the downloadable component that recognizes speech or writes notes. These are separate jobs.', steps: [
+    { title: 'Choose a transcription model', text: 'In Settings → Models, open Transcription. Choose by spoken language, download size and the description. Smaller models usually need less memory and time; test accuracy with your own audio.', image: 'models.jpg' },
+    { title: 'Download once, then use locally', text: 'Download and use installs a model and selects it when ready. Cancel stops a download; Retry starts it again. In use marks the saved choice. Installed models can be selected without downloading again.', image: 'models.jpg' },
+    { title: 'Choose a notes model separately', text: 'Summary models write notes, suggest templates and help with meeting names. Disk size is the download size, not the total memory needed while running. If a model is too slow, try a smaller one.', image: 'models-notes.jpg' },
+    { title: 'Understand connected providers', text: 'External providers need your own account and API key and may charge for use. Transcript text and instructions are sent to the selected provider. A remote Ollama or custom-server address also sends text to that server.', image: 'models-external.jpg' },
+  ] },
+  { title: 'Action items', intro: 'Assigned tasks from your notes are collected here so you can follow up across meetings.', steps: [
+    { title: 'Find the task you need', text: 'Open Action items. Search by task, meeting, person or due date. Use Anyone and Any date to narrow the list. The meeting heading opens the source meeting.', image: 'action-items.jpg' },
+    { title: 'Mark a task done', text: 'Check the box beside a finished task. It moves out of Open and into Done. Choose Done and uncheck it to reopen the task. All shows both states.', image: 'action-items.jpg' },
+    { title: 'Correct the task or owner', text: 'The pencil opens Edit task. Change the wording, person or due date, then Save task. These edits stay with the task when the meeting notes are written again.', image: 'task-edit.jpg', sequence: [{ image: 'action-items.jpg', label: 'Action items list' }, { image: 'task-edit.jpg', label: 'Edit task' }] },
+    { title: 'Make due dates unambiguous', text: 'A phrase such as “Friday” is kept as spoken. Set a calendar date in Edit task if you want it included in Overdue. Tetro does not guess which Friday was meant.', image: 'task-edit.jpg' },
+  ] },
+  { title: 'Files & recovery', intro: 'Find recordings, see what takes up space, and recover meetings you removed.', steps: [
+    { title: 'Find your audio', text: 'The folder button in a meeting opens its recording folder. Settings → Recordings shows the save location and whether new recordings keep audio. An imported file is copied into Tetro’s recording storage.', image: 'meeting-ready.jpg' },
+    { title: 'Check storage before cleaning up', text: 'Settings → Storage separates models, recordings and meeting data. Expand a category to inspect it. Models can be downloaded again; deleting audio can remove playback and retranscription for that meeting.', image: 'storage.jpg' },
+    { title: 'Recover a removed meeting', text: 'Use Trash in the meeting list. Restore returns a removed meeting or its selected parts. Trashed items still take up space while they remain recoverable.', image: 'trash.jpg' },
+    { title: 'Check before permanent deletion', text: 'Delete permanently cannot be undone from Tetro. Read the confirmation and keep any audio or exports you need first. You can cancel and leave the item in Trash.', image: 'trash.jpg' },
+  ] },
+];

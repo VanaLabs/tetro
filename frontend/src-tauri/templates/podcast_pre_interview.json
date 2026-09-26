@@ -1,0 +1,55 @@
+{
+  "name": "Podcast Pre-Interview",
+  "description": "Prepare a podcast interview with guest context, expertise, story angles, questions, boundaries, logistics, and follow-up.",
+  "sections": [
+    {
+      "title": "Interview Context",
+      "instruction": "Summarize the stated podcast, episode topic, purpose of the pre-interview, audience, format, and timing using only transcript facts. Write Not specified for anything unspoken. Do not add marketing language, assumptions, or unrelated discussion.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Guest Profile and Expertise",
+      "instruction": "List the guest's name, role, organization, experience, and areas of expertise explicitly stated in the transcript. Use Not specified for an unspoken detail. Use only transcript facts; do not infer or include unrelated discussion.",
+      "format": "list"
+    },
+    {
+      "title": "Stories and Key Talking Points",
+      "instruction": "Capture stories, experiences, examples, lessons, opinions, and key points the guest explicitly offered or agreed to discuss. Write Not specified if none were stated. Use only transcript facts; do not invent claims or include unrelated discussion.",
+      "format": "list",
+      "item_format": "| Topic | Story, example, or point | Evidence or context stated |\n| --- | --- | --- |"
+    },
+    {
+      "title": "Potential Episode Angles",
+      "instruction": "Summarize episode angles, themes, hooks, and audience takeaways explicitly discussed in the transcript. Write Not specified for an unspoken angle or takeaway. Do not add marketing language, assumptions, or unrelated discussion.",
+      "format": "list"
+    },
+    {
+      "title": "Questions to Prepare",
+      "instruction": "List questions explicitly proposed, requested, or left for the interview, with their topic or purpose when stated. Write Not specified for an unspoken purpose, priority, or answer. Use only transcript facts; do not invent questions or include unrelated discussion.",
+      "format": "list",
+      "item_format": "| Priority | Topic | Question | Context or purpose |\n| --- | --- | --- | --- |"
+    },
+    {
+      "title": "Boundaries and Verification Points",
+      "instruction": "Record topics to avoid, confidentiality or sensitivity boundaries, claims requiring verification, and corrections explicitly mentioned in the transcript. Write Not specified if none were stated. Do not infer concerns or include unrelated discussion.",
+      "format": "list"
+    },
+    {
+      "title": "Recording Logistics",
+      "instruction": "Capture the recording date, time, duration, format, platform, equipment, participants, preparation requirements, and other logistics explicitly discussed. Write Not specified for an unspoken detail. Do not infer or include unrelated discussion.",
+      "format": "list",
+      "item_format": "| Detail | Agreed or stated value | Owner | Due or timing |\n| --- | --- | --- | --- |"
+    },
+    {
+      "title": "Open Questions",
+      "instruction": "List questions or decisions that remain unresolved in the transcript. Write Not specified for an unspoken owner, answer, date, or constraint. Use only transcript facts and omit unrelated discussion.",
+      "format": "list"
+    },
+    {
+      "title": "Follow-up Actions",
+      "instruction": "Record only preparation or scheduling actions explicitly agreed in the transcript. For every unspoken owner, date, decision, answer, or constraint, write Not specified. Do not infer or include unrelated discussion.",
+      "format": "list",
+      "item_format": "| Owner | Action | Due | Context |\n| --- | --- | --- | --- |"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "name": "Plan",
+  "description": "Turn an informal voice note into a concrete, executable plan with workflows, milestones, ownership, risks, and next actions.",
+  "sections": [
+    {
+      "title": "Plan Overview",
+      "instruction": "Write a concise overview of the proposed plan: its goal, intended outcome, current status, and why it matters as explicitly stated in the transcript. Use only transcript facts; write Not specified for anything unspoken.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Goals & Success Criteria",
+      "instruction": "List the desired outcomes and any measurable definition of done, target, deadline, or signal of success explicitly stated in the transcript. Keep each item concrete and do not invent metrics.",
+      "format": "list",
+      "item_format": "| **Goal / Outcome** | **Success Measure** | **Target or Deadline** |\n| --- | --- | --- |"
+    },
+    {
+      "title": "Scope, Inputs & Constraints",
+      "instruction": "Capture what is in scope, out of scope, required inputs or resources, explicitly stated assumptions, constraints, budget, timing, and dependencies. Never turn an unstated assumption into a fact.",
+      "format": "list",
+      "item_format": "| **Type** | **Detail** | **Source / Owner** |\n| --- | --- | --- |"
+    },
+    {
+      "title": "Workstreams & Deliverables",
+      "instruction": "Break the plan into distinct workstreams or phases. For each, capture the deliverable, owner, status, and timing if stated. Do not invent owners or dates.",
+      "format": "list",
+      "item_format": "| **Workstream / Phase** | **Deliverable** | **Owner** | **Status** | **Timing** |\n| --- | --- | --- | --- | --- |"
+    },
+    {
+      "title": "Workflow Graph",
+      "instruction": "Translate any described process into a Mermaid flowchart inside a fenced code block tagged `mermaid`. Start with `flowchart TD`. Show sequence, decisions, loops, handoffs, and parallel work when stated. Use short node labels, connect nodes with arrows, and label decision branches when the transcript provides the condition. Do not invent missing steps; mark an unresolved branch as `Decision needed`. After the code block, add one short plain-language note about the flow. If no process is described, write None noted in this section.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Timeline & Milestones",
+      "instruction": "List phases, milestones, sequencing, deadlines, and checkpoints explicitly mentioned in the transcript. Preserve relative timing such as next week or after launch when no exact date is stated.",
+      "format": "list",
+      "item_format": "| **Phase / Milestone** | **Sequence or Dependency** | **Due / Timing** | **Status** |\n| --- | --- | --- | --- |"
+    },
+    {
+      "title": "Roles, Ownership & Handoffs",
+      "instruction": "Capture named people, teams, responsibilities, approvers, and handoffs explicitly assigned or discussed. Use Not specified where ownership is not stated.",
+      "format": "list",
+      "item_format": "| **Person / Team** | **Responsibility** | **Handoff / Approver** | **Timing** |\n| --- | --- | --- | --- |"
+    },
+    {
+      "title": "Risks, Dependencies & Open Questions",
+      "instruction": "Record risks, blockers, dependencies, unresolved choices, and questions explicitly raised. Include impact or mitigation only when stated; keep unknowns visible instead of guessing.",
+      "format": "list",
+      "item_format": "| **Risk / Dependency / Question** | **Impact or Why It Matters** | **Mitigation / Decision Needed** | **Owner** |\n| --- | --- | --- | --- |"
+    },
+    {
+      "title": "Next Actions",
+      "instruction": "Turn only explicitly agreed or clearly requested next steps into concrete tasks. Include owner, due date, priority, and dependency when stated. Do not convert general ideas into commitments.",
+      "format": "list",
+      "item_format": "| **Owner** | **Action** | **Due / Timing** | **Priority** | **Dependency / Definition of Done** |\n| --- | --- | --- | --- | --- |"
+    }
+  ]
+}

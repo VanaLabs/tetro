@@ -1,0 +1,29 @@
+allowBuilds:
+  bun: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - prosemirror-view@1.42.6
+# Keep the editor single-instanced and pin compatible security fixes.
+overrides:
+  uuid: 11.1.1
+  '@babel/core': 7.29.7
+  '@tiptap/core': 2.27.3
+  prosemirror-model: 1.25.12
+  prosemirror-state: 1.4.3
+  prosemirror-view: 1.42.6
+  prosemirror-transform: 1.10.5
+  prosemirror-tables: 1.8.5
+  shell-quote: 1.10.0
+  postcss: 8.5.28
+  markdown-it: 14.3.2
+  linkify-it: 5.0.2
+  'brace-expansion@^2.0.1': 2.1.7
+  axios: 1.20.0
+  'nanoid@^3': 3.3.19
+  'form-data@^4': 4.0.6
+  joi: 17.13.8
+  '@babel/runtime': 7.29.7
+  '@babel/helpers': 7.29.7
+  'postcss-selector-parser@^6': 6.1.4
+  browserslist: 4.29.1
+  baseline-browser-mapping: 2.11.26
