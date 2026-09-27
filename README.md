@@ -1,5 +1,7 @@
 # Tetro
 
+Tetro is developed by Vana Labs.
+
 Tetro is a desktop app for recording meetings, transcribing audio, and turning
 conversations into editable notes and action items. It can use local models for
 transcription and notes. If you choose an external AI provider, the content
@@ -13,8 +15,8 @@ see the notices bundled in the app. The **Tetro** name, wordmark, logos, app
 icons, and other identity artwork belong to **Vana Labs** and are
 reserved separately. See [BRAND.md](BRAND.md) before distributing a fork.
 
-This repository publishes the source code. It does not provide a signed and
-notarized installer yet.
+This private repository contains the consumer app source. It does not provide a
+signed and notarized installer yet.
 
 ## Source layout
 
