@@ -1,46 +1,61 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Expand } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { GUIDE_TOPICS as TOPICS, type GuideStep } from './topics';
 
 const TAB_LABELS = ['Record', 'Import', 'Transcript', 'Notes', 'Templates', 'Models', 'Tasks', 'Files'] as const;
 
-function GuideImage({ step, reduced }: { step: GuideStep; reduced: boolean }) {
+function GuideImage({ step }: { step: GuideStep }) {
   const [frame, setFrame] = useState(0);
+  const [ready, setReady] = useState<Set<string>>(new Set());
+  const [failed, setFailed] = useState<Set<string>>(new Set());
   const sequence = step.sequence ?? [{ image: step.image, label: step.title }];
-  useEffect(() => {
-    if (reduced || sequence.length < 2) return;
-    const timer = window.setInterval(() => setFrame(index => (index + 1) % sequence.length), 2400);
-    return () => window.clearInterval(timer);
-  }, [reduced, sequence.length]);
-  return <div className="tetro-guide-image">{sequence.map((item, index) => <img
-    key={item.image}
+  const shown = sequence[frame];
+  const resultReady = sequence.length > 1 && ready.has(sequence[1].image);
+  const switchFrame = () => setFrame(index => index === 0 ? 1 : 0);
+  const images = (large: boolean) => sequence.map((item, index) => <img
+    key={`${large ? 'large' : 'small'}-${item.image}`}
     className={`tetro-guide-frame${frame === index ? ' is-visible' : ''}`}
     src={`/tetro/guide/${item.image}`}
     alt={frame === index ? `Example screen: ${item.label}` : ''}
     aria-hidden={frame !== index}
-    decoding="async"
-  />)}</div>;
+    loading="eager"
+    onLoad={() => setReady(previous => new Set(previous).add(item.image))}
+    onError={() => setFailed(previous => new Set(previous).add(item.image))}
+  />);
+  const actionButton = () => <button type="button" className="tetro-key" disabled={frame === 0 && !resultReady} onClick={switchFrame}>
+    {frame === 0 ? `Show result of “${step.action}”` : 'Show before'}
+  </button>;
+  return <div className="tetro-guide-visual">
+    <div className="tetro-guide-image">{images(false)}{failed.has(shown.image) && <p role="alert">This example image could not load.</p>}</div>
+    <div className="tetro-guide-image-controls">
+      <span aria-live="polite">{sequence.length > 1 ? `${frame === 0 ? 'Before' : 'After'} · ` : ''}{shown.label}</span>
+      {sequence.length > 1 && actionButton()}
+      <Dialog>
+        <DialogTrigger asChild><button type="button" className="tetro-key"><Expand aria-hidden="true" />View larger</button></DialogTrigger>
+        <DialogContent className="tetro-guide-viewer">
+          <DialogTitle>{step.title}</DialogTitle>
+          <DialogDescription className="sr-only">{step.text}</DialogDescription>
+          <div className="tetro-guide-viewer-image">{images(true)}{failed.has(shown.image) && <p role="alert">This example image could not load.</p>}</div>
+          {sequence.length > 1 && <div className="tetro-guide-viewer-controls"><span>{frame === 0 ? 'Before' : 'After'} · {shown.label}</span>{actionButton()}</div>}
+        </DialogContent>
+      </Dialog>
+    </div>
+  </div>;
 }
 
 export default function HelpPage() {
   const router = useRouter();
   const [topic, setTopic] = useState(0);
   const [step, setStep] = useState(0);
-  const [reduced, setReduced] = useState(false);
   const tabs = useRef<HTMLDivElement>(null);
   const current = TOPICS[topic].steps[step];
   const last = step === TOPICS[topic].steps.length - 1;
-  useEffect(() => {
-    const media = matchMedia('(prefers-reduced-motion: reduce)');
-    const syncMotion = () => setReduced(media.matches);
-    syncMotion();
-    media.addEventListener('change', syncMotion);
-    return () => media.removeEventListener('change', syncMotion);
-  }, []);
   const openTopic = (index: number) => { setTopic(index); setStep(0); };
   return <div className="tetro-help">
-    <p className="tetro-help-intro">Choose a topic, then use Back and Next. Where two real screens show a change, they loop until you move on.</p>
+    <p className="tetro-help-intro">Choose a topic, then use Back and Next. Some examples let you switch between the screen before an action and its result.</p>
     <div ref={tabs} className="tetro-help-tabs" role="tablist" aria-label="Walkthroughs">{TOPICS.map((t, i) => <button key={t.title} id={`guide-tab-${i}`} role="tab" aria-label={t.title} title={t.title} aria-controls="guide-panel" aria-selected={topic === i} tabIndex={topic === i ? 0 : -1} onClick={() => openTopic(i)} onKeyDown={event => {
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? TOPICS.length - 1 : event.key === 'ArrowRight' ? (i + 1) % TOPICS.length : event.key === 'ArrowLeft' ? (i + TOPICS.length - 1) % TOPICS.length : null;
       if (next === null) return;
@@ -48,7 +63,7 @@ export default function HelpPage() {
     }}>{TAB_LABELS[i]}</button>)}</div>
     <section id="guide-panel" className="tetro-guide" role="tabpanel" aria-labelledby={`guide-tab-${topic}`}>
       <header className="tetro-guide-heading"><h2>{TOPICS[topic].title}</h2><p>{TOPICS[topic].intro}</p></header>
-      <GuideImage key={`${topic}-${step}`} step={current} reduced={reduced} />
+      <GuideImage key={`${topic}-${step}`} step={current} />
       <div className="tetro-guide-caption"><span className="tetro-guide-step">{step + 1} / {TOPICS[topic].steps.length}</span><div aria-live="polite"><h3>{current.title}</h3><p>{current.text}</p></div></div>
       <div className="tetro-guide-controls"><button className="tetro-key" disabled={!step} onClick={() => setStep(s => s - 1)}>Back</button><button className="tetro-key" disabled={last} onClick={() => setStep(s => s + 1)}>Next</button></div>
       <details className="tetro-guide-outline"><summary>Read all steps</summary><ol>{TOPICS[topic].steps.map((s, i) => <li key={s.title}><button className="tetro-link" onClick={() => setStep(i)}>{i + 1}. {s.title}</button><p>{s.text}</p></li>)}</ol></details>

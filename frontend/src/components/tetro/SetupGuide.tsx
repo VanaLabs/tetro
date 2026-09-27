@@ -10,12 +10,14 @@ const DISMISS_KEY = 'tetro.setupGuideDismissed';
 type Status = { transcription: boolean; notes: boolean };
 
 async function hasTranscriptionModel() {
-  const config = await invoke<{ provider?: string } | null>('api_get_transcript_config').catch(() => null);
-  const provider = config?.provider === 'parakeet' ? 'parakeet' : 'whisper';
+  const config = await invoke<{ provider?: string; model?: string } | null>('api_get_transcript_config').catch(() => null);
+  if (!config?.model) return false;
+  const provider = config.provider === 'parakeet' ? 'parakeet' : config.provider === 'localWhisper' ? 'whisper' : null;
+  if (!provider) return false;
   try {
     await invoke(`${provider}_init`);
-    const models = await invoke<{ status: unknown }[]>(`${provider}_get_available_models`);
-    return models.some(m => m.status === 'Available');
+    const models = await invoke<{ name: string; status: unknown }[]>(`${provider}_get_available_models`);
+    return models.some(m => m.name === config.model && m.status === 'Available');
   } catch { return false; }
 }
 
@@ -28,7 +30,7 @@ async function hasNotesModel() {
   return true;
 }
 
-/** A dismissible checklist on Home that points new users at the two models Tetro needs. Never blocks the app. */
+/** A dismissible checklist for the selected transcription model and optional local notes. */
 export function SetupGuide({ onChooseTranscription }: { onChooseTranscription: () => void }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status | null>(null);
@@ -56,7 +58,7 @@ export function SetupGuide({ onChooseTranscription }: { onChooseTranscription: (
 
   return <section className="tetro-setup" aria-label="Set up Tetro">
     <div className="tetro-setup-head">
-      <b>Two downloads and you’re ready</b>
+      <b>{status.transcription ? 'Add local notes when you’re ready' : 'Choose a transcription model to start'}</b>
       <button className="tetro-icon" onClick={dismiss} aria-label="Hide setup tips" title="Hide setup tips"><X /></button>
     </div>
     <ol>

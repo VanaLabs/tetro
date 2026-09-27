@@ -952,10 +952,18 @@ button.tetro-stamp:hover { color:var(--tetro-accent); }
 .tetro-help-tabs button:hover { color:var(--tetro-ink); background:var(--tetro-selected); }
 .tetro-help-tabs button[aria-selected='true'] { background:var(--tetro-paper); color:var(--tetro-ink); box-shadow:0 1px 2px rgba(0,0,0,.09),inset 0 0 0 1px var(--tetro-line-strong); }
 .tetro-guide { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(230px,.8fr); align-content:start; align-items:start; border:1px solid var(--tetro-line); border-radius:12px; overflow:hidden; background:var(--tetro-paper); }
-.tetro-guide-image { grid-column:1; grid-row:2 / 5; width:min(100%,calc((100dvh - 250px) * 110 / 69)); position:relative; overflow:hidden; aspect-ratio:110 / 69; background:var(--tetro-desk); }
-.tetro-guide-frame { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity .55s ease-in-out; }
-.tetro-guide-frame:first-child { opacity:1; }
+.tetro-guide-visual { grid-column:1; grid-row:2 / 5; min-width:0; border-right:1px solid var(--tetro-line); }
+.tetro-guide-image { width:100%; position:relative; overflow:hidden; aspect-ratio:110 / 69; background:var(--tetro-desk); }
+.tetro-guide-frame { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity .35s ease-in-out; }
 .tetro-guide-frame.is-visible { opacity:1; }
+.tetro-guide-image>p,.tetro-guide-viewer-image>p { position:absolute; inset:0; display:grid; place-items:center; padding:20px; color:var(--tetro-muted); background:var(--tetro-panel); }
+.tetro-guide-image-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 12px; border-top:1px solid var(--tetro-line); }
+.tetro-guide-image-controls>span { flex:1; min-width:120px; color:var(--tetro-muted); font-size:11px; }
+.tetro-guide-image-controls svg { display:inline; width:13px; height:13px; margin-right:5px; }
+.tetro-guide-viewer { display:flex; flex-direction:column; gap:6px; width:min(1100px,calc(100vw - 32px)); max-width:none; height:min(760px,calc(100dvh - 32px)); max-height:none; overflow:hidden; }
+.tetro-guide-viewer>p { color:var(--tetro-muted); }
+.tetro-guide-viewer-image { flex:1; min-height:0; position:relative; overflow:hidden; background:var(--tetro-desk); }
+.tetro-guide-viewer-controls { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:4px; color:var(--tetro-muted); font-size:12px; }
 .tetro-guide-caption { grid-column:2; display:flex; flex-direction:column; gap:10px; align-items:flex-start; min-height:76px; padding:20px 20px 12px; font-size:13px; }
 .tetro-guide-step { white-space:nowrap; color:var(--tetro-muted); font:11px var(--font-tetro-mono); }
 .tetro-guide-controls { grid-column:2; display:flex; gap:8px; padding:0 20px 18px; align-items:center; flex-wrap:wrap; }
@@ -1040,10 +1048,10 @@ body.tetro-printing .tetro-print-controls button { border:1px solid #bbb; paddin
 .tetro-guide-outline[open] { max-height:220px; overflow-y:auto; }
 @container(max-width:650px) {
   .tetro-guide { display:flex; flex-direction:column; }
-  .tetro-guide-heading,.tetro-guide-caption,.tetro-guide-controls,.tetro-guide-outline { width:100%; }
+  .tetro-guide-heading,.tetro-guide-visual,.tetro-guide-caption,.tetro-guide-controls,.tetro-guide-outline { width:100%; }
   .tetro-guide-caption { order:1; padding:14px 16px 10px; }
   .tetro-guide-controls { order:2; padding:0 16px 14px; }
-  .tetro-guide-image { order:3; }
+  .tetro-guide-visual { order:3; border-right:0; border-top:1px solid var(--tetro-line); }
   .tetro-guide-outline { order:4; padding:12px 16px; }
 }
 .tetro-guide-outline summary { cursor:pointer; color:var(--tetro-muted); }
