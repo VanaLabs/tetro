@@ -30,10 +30,10 @@ export interface UpdateProgress {
 export class UpdateService {
   // A Tetro release channel must be configured before packaged updates are enabled.
   async checkForUpdates(_force = false): Promise<UpdateInfo> {
-    return { available: false, currentVersion: await getVersion(), body: 'Tetro development builds update from source.' };
+    return { available: false, currentVersion: await getVersion(), body: 'Automatic updates are not available for this Tetro build.' };
   }
   async downloadAndInstall(_update: Update, _onProgress?: (progress: UpdateProgress) => void): Promise<void> {
-    throw new Error('Tetro has no signed release channel configured. Use the development launcher.');
+    throw new Error('Tetro has no signed update channel configured yet.');
   }
   async getCurrentVersion(): Promise<string> { return getVersion(); }
   wasCheckedRecently(): boolean { return true; }

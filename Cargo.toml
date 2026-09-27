@@ -20,3 +20,7 @@ tokio = { version = "1.32.0", features = ["full"] }
 # Preserve the pinned engine API while fixing Metal builds in paths with spaces.
 [patch.crates-io]
 whisper-rs-sys = { path = "vendor/whisper-rs-sys" }
+
+# macOS 27 rejects some stripped proc-macro dylibs during release builds.
+[profile.release.build-override]
+strip = "none"
