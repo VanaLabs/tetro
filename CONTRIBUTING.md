@@ -24,7 +24,7 @@ third-party material you include and identify its source and license in the
 change description.
 
 The Tetro name, wordmark, logos, app icons, and other identity artwork are
-reserved to Sedrak Hovhannisyan. A code contribution does not convey rights
+reserved to Vana Labs. A code contribution does not convey rights
 to that identity. Read [`BRAND.md`](BRAND.md) before distributing a modified
 build.
 

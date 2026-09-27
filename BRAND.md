@@ -5,7 +5,7 @@ License in [`LICENSE.md`](LICENSE.md). Earlier copyright notices remain in
 that file. Third-party components keep their own licenses and notices.
 
 **Tetro**, the Tetro wordmark, logos, app icons, and other Tetro identity artwork
-are reserved to **Sedrak Hovhannisyan**. They are not licensed under MIT. This
+are reserved to **Vana Labs**. They are not licensed under MIT. This
 includes the Tetro identity files in `frontend/public/tetro/identity/`, the
 Tetro wordmark and icon files in `frontend/public/tetro/`, and Tetro branded
 files in `frontend/src-tauri/icons/`. Source code that displays these assets remains
@@ -13,7 +13,7 @@ under MIT; this reservation applies to the name and artwork, not to that code.
 
 You may refer to Tetro by name to identify the original project, describe
 compatibility, or give attribution. This repository does not grant permission
-to use the Tetro name or artwork to brand a modified version, imply Sedrak's
+to use the Tetro name or artwork to brand a modified version, imply Vana Labs'
 endorsement, or distribute a modified product as an official Tetro release.
 Forks intended for distribution should use their own name and visual identity.
 You may keep unchanged copies of the identity artwork in a source fork for

@@ -44,7 +44,7 @@ for folder in (ROOT/'vendor').glob('*'):
 # Keep both project copyright notices while making the separate brand terms clear.
 result=('Tetro — Open-source notices\n\n'
         'Project code: MIT. The Tetro name, wordmark, logos, app icons and identity artwork\n'
-        'are reserved to Sedrak Hovhannisyan. See BRAND.md in the source repository.\n\n'
+        'are reserved to Vana Labs. See BRAND.md in the source repository.\n\n'
         'Project code license\n\n'+(ROOT/'LICENSE.md').read_text()+'\n\nDependency notices\n')
 for text,names in groups.values(): result+='\n'+'─'*64+'\n'+'\n'.join(sorted(set(names)))+'\n\n'+text+'\n'
 (FRONT/'public/tetro/licenses.txt').write_text(result)

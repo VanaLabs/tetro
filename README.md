@@ -10,7 +10,7 @@ needed for that request is sent to that provider.
 Project-authored code and written documentation are available under the
 [MIT License](LICENSE.md). Third-party components keep their own licenses;
 see the notices bundled in the app. The **Tetro** name, wordmark, logos, app
-icons, and other identity artwork belong to **Sedrak Hovhannisyan** and are
+icons, and other identity artwork belong to **Vana Labs** and are
 reserved separately. See [BRAND.md](BRAND.md) before distributing a fork.
 
 This repository publishes the source code. It does not provide a signed and

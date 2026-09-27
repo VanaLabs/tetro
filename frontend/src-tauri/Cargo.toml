@@ -2,9 +2,9 @@
 name = "tetro"
 version = "0.4.1"
 description = "Tetro desktop meeting recorder, transcription and notes"
-authors = ["Sujith S", "Sedrak Hovhannisyan"]
+authors = ["Sujith S", "Vana Labs"]
 license = "MIT"
-repository = "https://github.com/Sedrak-Hovhannisyan/tetro"
+repository = "https://github.com/VanaLabs/tetro"
 edition = "2021"
 rust-version = "1.77"
 
