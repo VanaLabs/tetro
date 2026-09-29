@@ -64,3 +64,40 @@
   .shell[data-step='2'] :global(.tetro-setup-card) { padding:10px 14px; }
   .shell[data-step='2'] :global(.tetro-setup-model) { margin-top:6px; padding:8px 12px; }
 }
+
+.themePicker {
+  position:absolute;
+  top:16px;
+  left:16px;
+  z-index:2;
+  display:flex;
+  gap:4px;
+  padding:4px;
+  border:1px solid var(--tetro-line);
+  border-radius:10px;
+  background:var(--tetro-panel);
+}
+.themePicker button {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  min-height:36px;
+  padding:6px 10px;
+  border:1px solid transparent;
+  border-radius:7px;
+  color:var(--tetro-muted);
+  font-size:13px;
+  cursor:pointer;
+}
+.themePicker button[aria-pressed='true'] {
+  background:var(--tetro-paper);
+  border-color:var(--tetro-line-strong);
+  color:var(--tetro-ink);
+  box-shadow:0 1px 2px #0002;
+}
+.themePicker button:focus-visible { outline:2px solid var(--tetro-accent); outline-offset:2px; }
+@media (max-width:620px) {
+  .shell { padding-top:62px; }
+  .themePicker { top:10px; left:12px; }
+}

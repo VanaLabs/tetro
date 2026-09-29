@@ -1,9 +1,10 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProgressIndicator } from './shared/ProgressIndicator';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import type { OnboardingContainerProps } from '@/types/onboarding';
+import { useTheme } from '@/contexts/ThemeContext';
 import styles from './OnboardingContainer.module.css';
 
 export function OnboardingContainer({
@@ -25,6 +26,7 @@ export function OnboardingContainer({
   canGoPrevious = true,
 }: OnboardingContainerProps) {
   const { goToStep, goPrevious, goNext } = useOnboarding();
+  const { theme, setTheme } = useTheme();
 
   const handlePrevious = () => {
     if (onPrevious) {
@@ -48,6 +50,14 @@ export function OnboardingContainer({
 
   return (
     <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50 overflow-hidden">
+      <div className={styles.themePicker} role="group" aria-label="Appearance">
+        <button type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
+          <Sun size={16} aria-hidden="true" /> Light
+        </button>
+        <button type="button" aria-pressed={theme === 'dark'} onClick={() => setTheme('dark')}>
+          <Moon size={16} aria-hidden="true" /> Dark
+        </button>
+      </div>
       <div className={cn(styles.shell, className)} data-step={step}>
         {/* Progress Indicator with Navigation - Fixed */}
         {step && !hideProgress && (
