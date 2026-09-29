@@ -4,7 +4,7 @@
 
 ## Install on your Mac
 
-1. Download **Tetro_9.1.1_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
+1. Download **Tetro_9.1.2_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
 2. Open the downloaded DMG, then **drag Tetro onto Applications** in that window. Wait for the copy to finish.
 3. Open **Finder → Applications → Tetro**. You can eject the Tetro disk image afterward.
 4. If macOS says Apple cannot check Tetro or the developer cannot be verified, dismiss that message with **Done** (or **OK**, depending on macOS). Keep the app in Applications.
