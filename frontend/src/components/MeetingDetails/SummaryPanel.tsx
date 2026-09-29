@@ -260,6 +260,7 @@ export function SummaryPanel({
           languageSlot={languageSlot} onOpenLanguage={trigger => { languageTrigger.current = trigger; setLangPickerOpen(true); }}
           meetingId={meeting.id} onPromptChange={onPromptChange} isSaving={isSaving} isDirty={isSummaryDirty}
           onSave={onSaveAll} onCopy={onCopySummary} onExport={onExportSummary} isExporting={isExporting}
+          onCancelEdits={() => summaryRef.current?.cancelEdits()}
         />
       </div>
       <Dialog open={langPickerOpen} onOpenChange={setLangPickerOpen}><DialogContent className="tetro-language-dialog" onCloseAutoFocus={event => { event.preventDefault(); languageTrigger.current?.focus(); }}>

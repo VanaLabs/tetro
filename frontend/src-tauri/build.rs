@@ -21,7 +21,14 @@ fn main() {
     ffmpeg::ensure_ffmpeg_binary();
     onnxruntime::ensure_onnxruntime_runtime();
 
-    tauri_build::build()
+    if std::env::var_os("CARGO_FEATURE_DEV_PROFILE").is_some() {
+        println!("cargo:rerun-if-changed=dev-permissions");
+        tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
+            tauri_build::AppManifest::new().permissions_path_pattern("dev-permissions/*.toml")
+        )).expect("build isolated Dev capabilities");
+    } else {
+        tauri_build::build();
+    }
 }
 
 /// Detects GPU acceleration capabilities and provides build guidance

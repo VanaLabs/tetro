@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHand
 import { Summary, SummaryDataResponse, BlockNoteBlock } from '@/types';
 import { AISummary } from './index';
 import { Block } from '@blocknote/core';
-import { useCreateBlockNote } from '@blocknote/react';
+import { SuggestionMenuController, useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/shadcn';
+import { TetroSlashMenu } from './TetroSlashMenu';
+import { tetroEditorDropdown } from './TetroEditorDropdown';
 import { blocksToMarkdownSafely } from '@/lib/blocknote-markdown';
 import { useTheme } from '@/contexts/ThemeContext';
 import { invoke } from '@tauri-apps/api/core';
@@ -31,6 +33,7 @@ interface BlockNoteSummaryViewProps {
 
 export interface BlockNoteSummaryViewRef {
   saveSummary: () => Promise<void>;
+  cancelEdits: () => void;
   getMarkdown: () => Promise<string>;
   isDirty: boolean;
 }
@@ -51,6 +54,7 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
   const loaded = useRef(false);
   const dirty = useRef(false);
   const base = useRef<Block[]>([]);
+  const stopScrollHold = useRef<(() => void) | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [saving, setSaving] = useState(false);
@@ -60,11 +64,39 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
   const [earlierDraft, setEarlierDraft] = useState<Block[] | null>(null);
   const draftKey = `tetro.summaryDraft.${meeting?.id ?? 'unsaved'}`;
   const setDirty = useCallback((value: boolean) => { dirty.current = value; setIsDirty(value); }, []);
+  const scrollArea = useCallback(() => root.current?.closest<HTMLElement>('.tetro-summary-scroll'), []);
+  const restoreScroll = useCallback((top: number | undefined) => {
+    if (top === undefined) return;
+    const restore = () => { const area = scrollArea(); if (area) area.scrollTop = top; };
+    restore();
+    requestAnimationFrame(restore);
+  }, [scrollArea]);
+  const holdScroll = useCallback((top: number | undefined) => {
+    stopScrollHold.current?.();
+    const area = scrollArea();
+    if (!area || top === undefined) return;
+    // BlockNote can scroll its first selection into view after the save state
+    // has rendered, later than a requestAnimationFrame restoration.
+    const restore = () => { if (area.scrollTop !== top) area.scrollTop = top; };
+    const stop = () => { area.removeEventListener('scroll', restore); clearTimeout(timer); stopScrollHold.current = null; };
+    area.addEventListener('scroll', restore);
+    stopScrollHold.current = stop;
+    restore();
+    requestAnimationFrame(restore);
+    const timer = setTimeout(() => { restore(); stop(); }, 250);
+  }, [scrollArea]);
+  useEffect(() => () => stopScrollHold.current?.(), []);
   useEffect(() => { loaded.current = false; setDirty(false); setMessage(''); }, [meeting?.id, setDirty]);
+
+  useEffect(() => { editor.isEditable = !saving; }, [editor, saving]);
 
   useEffect(() => {
     let cancelled = false;
     if (!modern || dirty.current) return;
+    if (loaded.current) {
+      const incomingSignature = data?.summary_json?.length ? contentSignature(data.summary_json) : null;
+      if (incomingSignature && incomingSignature === contentSignature(editor.document)) return;
+    }
     loaded.current = false;
     const load = async () => {
       try {
@@ -80,17 +112,19 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
             else if (saved.blocks?.length) setEarlierDraft(saved.blocks);
           }
         } catch { /* The original saved notes are still available. */ }
+        const scrollTop = scrollArea()?.scrollTop;
         editor.replaceBlocks(editor.document, parsed);
         base.current = structuredClone(editor.document);
         if (restored?.length) editor.replaceBlocks(editor.document, restored);
         setBlocks([...editor.document]);
+        restoreScroll(scrollTop);
         if (restored?.length) { setDirty(true); setMessage('Your unfinished edits are here.'); }
         loaded.current = true;
       } catch { setMessage('This summary could not be opened. Your saved copy is unchanged.'); }
     };
     void load();
     return () => { cancelled = true; };
-  }, [data?.markdown, data?.summary_json, draftKey, editor, modern, setDirty]);
+  }, [data?.markdown, data?.summary_json, draftKey, editor, modern, restoreScroll, scrollArea, setDirty]);
 
   useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
   useEffect(() => {
@@ -147,6 +181,7 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
   }, [editor]);
   const save = useCallback(async () => {
     if (!onSave || !dirty.current || saving) return;
+    const scrollTop = scrollArea()?.scrollTop;
     setSaving(true); setMessage('');
     const savedBlocks = structuredClone(editor.document);
     try {
@@ -160,21 +195,24 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
       setMessage('Saved');
       setRevision(r => r + 1);
     } catch (e) { setMessage(String(e)); throw e; }
-    finally { setSaving(false); }
-  }, [onSave, saving, editor, getMarkdown, draftKey, setDirty]);
-  const cancel = () => {
+    finally { holdScroll(scrollTop); setSaving(false); }
+  }, [onSave, saving, editor, getMarkdown, draftKey, holdScroll, scrollArea, setDirty]);
+  const cancel = useCallback(() => {
+    const scrollTop = scrollArea()?.scrollTop;
     loaded.current = false; editor.replaceBlocks(editor.document, structuredClone(base.current));
     setBlocks([...editor.document]); try { localStorage.removeItem(draftKey); } catch { /* Keep the saved notes visible. */ } setDirty(false); setMessage(''); loaded.current = true;
-  };
-  useImperativeHandle(ref, () => ({ saveSummary: save, getMarkdown, isDirty }), [save, getMarkdown, isDirty]);
+    holdScroll(scrollTop);
+  }, [draftKey, editor, holdScroll, scrollArea, setDirty]);
+  useImperativeHandle(ref, () => ({ saveSummary: save, cancelEdits: cancel, getMarkdown, isDirty }), [save, cancel, getMarkdown, isDirty]);
 
   if (!modern) return <AISummary summary={summaryData as Summary} status={status} error={error} onSummaryChange={onSummaryChange ?? (() => {})} onRegenerateSummary={onRegenerateSummary ?? (() => {})} meeting={meeting} />;
   return <div ref={root} className="tetro-notes-editor w-full">
     {earlierDraft && <div className="tetro-edit-state" role="status"><span>Unfinished edits from an earlier version are available.</span><button className="tetro-link" onClick={() => { editor.replaceBlocks(editor.document, earlierDraft); setEarlierDraft(null); changed(); }}>Open those edits</button><button className="tetro-link" onClick={() => { try { localStorage.removeItem(draftKey); } catch {} setEarlierDraft(null); }}>Discard draft</button></div>}
-    <BlockNoteView editor={editor} editable={!saving} onChange={changed} theme={theme} />
-    {(isDirty || message || edits.length > 0) && <div className="tetro-edit-state" role="status">
-      <span>{saving ? 'Saving…' : message || (isDirty ? 'Unsaved edits' : 'Tinted text was edited by you')}</span>
-      {isDirty && <button className="tetro-link" disabled={saving} onClick={cancel}>Cancel edits</button>}
+    <BlockNoteView editor={editor} onChange={changed} theme={theme} slashMenu={false} shadCNComponents={{ DropdownMenu: tetroEditorDropdown }}>
+      <SuggestionMenuController triggerCharacter="/" suggestionMenuComponent={TetroSlashMenu} />
+    </BlockNoteView>
+    {(message || edits.length > 0) && <div className="tetro-edit-state" role="status">
+      <span>{message || 'Tinted text was edited by you'}</span>
     </div>}
   </div>;
 });

@@ -1,6 +1,6 @@
 {
     "name": "tetro",
-    "version": "9.1.2",
+    "version": "9.1.3",
     "private": true,
     "scripts": {
         "dev": "next dev -p 3118",
@@ -25,7 +25,9 @@
         "lint": "eslint src",
         "test:transcription-routing": "node tests/lib/transcription-language-routing.test.mjs",
         "test": "node scripts/test-isolated.mjs",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "dev:app": "node scripts/run-dev.mjs",
+        "dev:build": "tauri build --config src-tauri/tauri.dev.conf.json --features dev-profile --bundles app --ci"
     },
     "dependencies": {
         "@blocknote/core": "0.36.0",

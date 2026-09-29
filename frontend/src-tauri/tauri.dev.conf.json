@@ -1,0 +1,62 @@
+{
+  "productName": "Tetro Dev",
+  "identifier": "am.vanalabs.tetro.dev",
+  "app": {
+    "windows": [
+      {
+        "title": "Tetro Dev \u2014 Local testing",
+        "width": 1100,
+        "height": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "theme": "Light",
+        "decorations": true,
+        "devtools": true,
+        "minWidth": 740,
+        "minHeight": 500
+      }
+    ],
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "main",
+          "description": "Main window capability with file system and media access",
+          "windows": [
+            "main"
+          ],
+          "permissions": [
+            "core:path:default",
+            "core:event:default",
+            "core:window:default",
+            "core:app:default",
+            "core:resources:default",
+            "core:menu:default",
+            "core:tray:default",
+            "core:window:allow-set-title",
+            "notification:default",
+            "notification:allow-is-permission-granted",
+            "process:default",
+            "updater:default",
+            "dev-local"
+          ],
+          "remote": {
+            "urls": [
+              "http://localhost:3118/*"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "targets": [
+      "app"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": []
+    }
+  }
+}

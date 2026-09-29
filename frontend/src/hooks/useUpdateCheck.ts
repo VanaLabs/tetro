@@ -23,7 +23,8 @@ export function useUpdateCheck(options: UseUpdateCheckOptions = {}) {
       if (info.available) {
         if (optionsRef.current.onUpdateAvailable) optionsRef.current.onUpdateAvailable(info);
         else if (optionsRef.current.showNotification !== false) showUpdateNotification(info);
-      } else if (force) toast.success('Tetro is up to date.');
+      } else if (force && info.development) toast.info('Tetro Dev uses local builds. Consumer updates are disabled.');
+      else if (force) toast.success('Tetro is up to date.');
     } catch (error) {
       setUpdateInfo(null);
       if (force) toast.error('Could not check for updates. Try again later.', { description: String(error) });

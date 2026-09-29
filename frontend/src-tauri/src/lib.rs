@@ -503,13 +503,15 @@ pub fn run() {
         }));
     }
 
+    #[cfg(not(feature = "dev-profile"))]
+    { builder = builder.plugin(tauri_plugin_updater::Builder::new().build()); }
+
     builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(|app, shortcut, event| shortcuts::handle(app, shortcut, event.state())).build())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(whisper_engine::parallel_commands::ParallelProcessorState::new())
         .manage(Arc::new(RwLock::new(
             None::<notifications::manager::NotificationManager<tauri::Wry>>,

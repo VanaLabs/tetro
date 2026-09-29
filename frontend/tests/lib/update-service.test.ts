@@ -1,9 +1,10 @@
 import { beforeEach, expect, mock, test } from 'bun:test';
+let appName = 'Tetro';
 const check = mock(async (): Promise<any> => null);
 mock.module('@tauri-apps/plugin-updater', () => ({ check }));
-mock.module('@tauri-apps/api/app', () => ({ getVersion: async () => '0.4.1' }));
+mock.module('@tauri-apps/api/app', () => ({ getVersion: async () => '0.4.1', getName: async () => appName }));
 const { UpdateService } = await import('../../src/services/updateService');
-beforeEach(() => { check.mockReset(); check.mockResolvedValue(null); });
+beforeEach(() => { appName = 'Tetro'; check.mockReset(); check.mockResolvedValue(null); });
 test('first check runs, caches success, and manual checks bypass the interval', async () => {
   const service = new UpdateService();
   expect(service.wasCheckedRecently()).toBe(false);
@@ -48,4 +49,12 @@ test('periodic checks keep a downloaded resource usable until restart', async ()
   expect(repeated.close).toHaveBeenCalledTimes(1);
   await service.checkForUpdates(true);
   expect(first.close).not.toHaveBeenCalled();
+});
+
+test('dev app never checks the consumer update feed or exposes an installable update', async () => {
+  appName = 'Tetro Dev';
+  const service = new UpdateService();
+  expect(await service.checkForUpdates(true)).toEqual({ available: false, currentVersion: '0.4.1', development: true });
+  expect(check).not.toHaveBeenCalled();
+  expect(() => service.getUpdate()).toThrow();
 });

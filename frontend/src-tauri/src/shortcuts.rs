@@ -15,7 +15,7 @@ pub struct Shortcuts {
 
 impl Default for Shortcuts {
     fn default() -> Self {
-        Self { toggle_recording: "Alt+Super+R".into(), mark_moment: "Alt+Super+M".into() }
+        Self { toggle_recording: if crate::app_profile::IS_DEV { "Alt+Shift+Super+R" } else { "Alt+Super+R" }.into(), mark_moment: if crate::app_profile::IS_DEV { "Alt+Shift+Super+M" } else { "Alt+Super+M" }.into() }
     }
 }
 

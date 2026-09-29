@@ -1,8 +1,9 @@
 import { check, type Update } from '@tauri-apps/plugin-updater';
-import { getVersion } from '@tauri-apps/api/app';
+import { getVersion, getName } from '@tauri-apps/api/app';
 
 export interface UpdateInfo {
   available: boolean;
+  development?: boolean;
   currentVersion: string;
   version?: string;
   date?: string;
@@ -34,6 +35,10 @@ export class UpdateService {
 
   private async performCheck(): Promise<UpdateInfo> {
     const currentVersion = await getVersion();
+    if (await getName() === 'Tetro Dev') {
+      this.lastChecked = Date.now();
+      return this.info = { available: false, currentVersion, development: true };
+    }
     const next = await check({ timeout: 15000 });
     const previous = this.update;
     // A dialog may already hold downloaded bytes on this resource. Keep it alive

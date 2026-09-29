@@ -185,9 +185,10 @@ export default function RootLayout({
     const cleanedUpRef = { current: false };
 
     const setupListeners = async () => {
-      // Drag enter/over - show overlay only if beta feature is enabled
-      const unlistenDragEnter = await listen('tauri://drag-enter', () => {
-        if (loadBetaFeatures().importAndRetranscribe) {
+      // Native drag events also fire for blocks dragged inside the summary editor.
+      // Only file drags have paths, so ignore editor-only drags here.
+      const unlistenDragEnter = await listen<{ paths: string[] }>('tauri://drag-enter', (event) => {
+        if (event.payload.paths?.length && loadBetaFeatures().importAndRetranscribe) {
           setShowDropOverlay(true);
         }
       });
@@ -211,7 +212,7 @@ export default function RootLayout({
       // Drop - process files
       const unlistenDrop = await listen<{ paths: string[] }>('tauri://drag-drop', (event) => {
         setShowDropOverlay(false);
-        handleFileDrop(event.payload.paths);
+        if (event.payload.paths?.length) handleFileDrop(event.payload.paths);
       });
       if (cleanedUpRef.current) {
         unlistenDrop();

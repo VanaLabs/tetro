@@ -92,6 +92,7 @@ fn remember_name_format(p: &RecordingPreferences) {
 
 /// Get the default recordings folder based on platform
 pub fn get_default_recordings_folder() -> PathBuf {
+    if crate::app_profile::IS_DEV { return crate::app_profile::data_dir().expect("Dev profile unavailable").join("recordings"); }
     #[cfg(target_os = "windows")]
     {
         // Windows: %USERPROFILE%\Music\tetro-recordings

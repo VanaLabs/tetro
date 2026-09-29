@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 
-const SERVICE: &str = "am.vanalabs.tetro.provider-keys";
+const SERVICE: &str = crate::app_profile::CREDENTIAL_SERVICE;
 static OPERATIONS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[derive(Clone)]

@@ -2,7 +2,7 @@
 
 import type { ModelConfig } from '@/components/ModelSettingsModal';
 import { useEffect, useState, useRef, type ReactNode } from 'react';
-import { Sparkles, Square, Loader2, MoreHorizontal, Save, FileText, Languages, SlidersHorizontal, History, MessageSquarePlus, Copy, FileDown } from 'lucide-react';
+import { Sparkles, Square, Loader2, MoreHorizontal, Save, FileText, Languages, SlidersHorizontal, History, MessageSquarePlus, Copy, FileDown, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ModelPicker } from '@/components/tetro/ModelPicker';
 import { MeetingVersions } from '@/components/tetro/MeetingVersions';
@@ -36,13 +36,14 @@ interface SummaryGeneratorButtonGroupProps {
   isSaving: boolean;
   isDirty: boolean;
   onSave: () => Promise<void>;
+  onCancelEdits: () => void;
   onCopy: () => Promise<void>;
   onExport: (includeTranscript?: boolean, format?: 'md' | 'pdf') => Promise<void>;
   isExporting: boolean;
 }
 
 /** The primary action stays visible. More holds occasional actions without adding another row. */
-export function SummaryGeneratorButtonGroup({ hasModel, setModelConfig, onGenerateSummary, onChooseModel, onStopGeneration, customPrompt, onPromptChange, summaryStatus, availableTemplates, selectedTemplate, onTemplateSelect, hasTranscripts = true, hasSummary = false, isModelConfigLoading, onOpenModelSettings, languageSlot, languageSaving, languageLabel = 'Auto', onOpenLanguage, meetingId, isSaving, isDirty, onSave, onCopy, onExport, isExporting }: SummaryGeneratorButtonGroupProps) {
+export function SummaryGeneratorButtonGroup({ hasModel, setModelConfig, onGenerateSummary, onChooseModel, onStopGeneration, customPrompt, onPromptChange, summaryStatus, availableTemplates, selectedTemplate, onTemplateSelect, hasTranscripts = true, hasSummary = false, isModelConfigLoading, onOpenModelSettings, languageSlot, languageSaving, languageLabel = 'Auto', onOpenLanguage, meetingId, isSaving, isDirty, onSave, onCancelEdits, onCopy, onExport, isExporting }: SummaryGeneratorButtonGroupProps) {
   const moreButton = useRef<HTMLButtonElement>(null);
   const returnFocus = () => moreButton.current?.focus();
   const [modelOpen, setModelOpen] = useState(false);
@@ -51,22 +52,24 @@ export function SummaryGeneratorButtonGroup({ hasModel, setModelConfig, onGenera
   useEffect(() => { onOpenModelSettings?.(() => setModelOpen(true)); }, [onOpenModelSettings]);
   const generating = ['processing', 'summarizing', 'regenerating'].includes(summaryStatus);
   return <div className="tetro-notes-toolbar" data-editing={isDirty || isSaving || undefined}>
-    {hasTranscripts && (generating ? <button className="tetro-key tetro-danger" onClick={onStopGeneration} aria-label="Stop summarizing"><Square size={14} fill="currentColor" />Stop</button>
+    {isDirty && !generating && <span className="tetro-notes-edit-label" role="status">Unsaved edits</span>}
+    {!isDirty && hasTranscripts && (generating ? <button className="tetro-key tetro-danger" onClick={onStopGeneration} aria-label="Stop summarizing"><Square size={14} fill="currentColor" />Stop</button>
       : <button className={`tetro-key ${hasSummary ? 'tetro-key-amber' : ''} tetro-notes-primary`} disabled={isModelConfigLoading || isSaving || languageSaving} title={hasModel ? `Summary language: ${languageLabel}` : 'Choose a summary model'} onClick={() => { if (hasModel) void onGenerateSummary(customPrompt); else onChooseModel(); }}>
         {isModelConfigLoading || languageSaving ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}{languageSaving ? 'Saving language…' : isModelConfigLoading ? 'Loading…' : !hasModel ? 'Choose summary model' : hasSummary ? 'Write again' : 'Write summary'}
       </button>)}
-    {hasTranscripts && availableTemplates.length > 0 && <Select value={selectedTemplate} disabled={generating} onValueChange={value => { const t = availableTemplates.find(item => item.id === value); if (t) onTemplateSelect(t.id, t.name); }}>
+    {!isDirty && hasTranscripts && availableTemplates.length > 0 && <Select value={selectedTemplate} disabled={generating} onValueChange={value => { const t = availableTemplates.find(item => item.id === value); if (t) onTemplateSelect(t.id, t.name); }}>
       <SelectTrigger className="tetro-template-select" aria-label="Summary template" title="Summary template"><FileText size={14} aria-hidden="true" /><SelectValue placeholder="Choose template" /></SelectTrigger>
       <SelectContent className="tetro-template-options" position="popper" align="start">
         {availableTemplates.some(t => isEverydayTemplate(t.id)) && <SelectGroup><SelectLabel>Everyday</SelectLabel>{availableTemplates.filter(t => isEverydayTemplate(t.id)).map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectGroup>}
         {availableTemplates.some(t => !isEverydayTemplate(t.id)) && <SelectGroup><SelectLabel>More templates</SelectLabel>{availableTemplates.filter(t => !isEverydayTemplate(t.id)).map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectGroup>}
       </SelectContent>
     </Select>}
-    {(hasTranscripts || hasSummary) && <>
+    {!isDirty && (hasTranscripts || hasSummary) && <>
       <span className="tetro-notes-wide">{languageSlot}</span>
       <span className="tetro-notes-wide"><ModelPicker purpose="notes" compact disabled={generating} onSaved={setModelConfig} /></span>
     </>}
     {(isDirty || isSaving) && !generating && <button className="tetro-key tetro-save-notes" disabled={isSaving} onClick={() => void onSave()} aria-label="Save summary">{isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}{isSaving ? 'Saving…' : 'Save edits'}</button>}
+    {isDirty && !generating && <button className="tetro-key tetro-cancel-notes" disabled={isSaving} onClick={onCancelEdits}><X size={14} />Cancel edits</button>}
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild><button ref={moreButton} className="tetro-key tetro-notes-more" aria-label="More summary actions">More<MoreHorizontal size={14} /></button></DropdownMenuTrigger>
       <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (modelOpen || versionsOpen || instructionsOpen) event.preventDefault(); }}>

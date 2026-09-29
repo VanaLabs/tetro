@@ -12,7 +12,7 @@ pub fn install(app: &App) -> tauri::Result<()> {
     let settings = item("tetro-settings", "Settings…", Some("CmdOrCtrl+,"))?;
     let help = item("tetro-help", "Tetro Guide", Some("CmdOrCtrl+Shift+H"))?;
     let shortcuts = item("tetro-shortcuts", "Keyboard Shortcuts", None)?;
-    let application = Submenu::with_items(app, "Tetro", true, &[
+    let application = Submenu::with_items(app, crate::app_profile::NAME, true, &[
         &about, &settings, &Native::separator(app)?,
         #[cfg(target_os = "macos")] &Native::services(app, None)?,
         #[cfg(target_os = "macos")] &Native::hide(app, None)?,
