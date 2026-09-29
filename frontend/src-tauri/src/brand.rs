@@ -15,6 +15,8 @@ static FRONTEND_BUSY: AtomicBool = AtomicBool::new(false);
 static REDUCE_MOTION: AtomicBool = AtomicBool::new(false);
 static LEVEL: AtomicU32 = AtomicU32::new(0);
 static GENERATION: AtomicU64 = AtomicU64::new(0);
+#[cfg(target_os = "macos")]
+static MENU_BAR_DARK: AtomicBool = AtomicBool::new(false);
 
 const LIVE: [&[u8]; 8] = [
     include_bytes!("../icons/letter/recording-0.rgba").as_slice(),
@@ -25,6 +27,16 @@ const LIVE: [&[u8]; 8] = [
     include_bytes!("../icons/letter/recording-5.rgba").as_slice(),
     include_bytes!("../icons/letter/recording-6.rgba").as_slice(),
     include_bytes!("../icons/letter/recording-7.rgba").as_slice()
+];
+const LIVE_DARK: [&[u8]; 8] = [
+    include_bytes!("../icons/letter/recording-0-dark.rgba").as_slice(),
+    include_bytes!("../icons/letter/recording-1-dark.rgba").as_slice(),
+    include_bytes!("../icons/letter/recording-2-dark.rgba").as_slice(),
+    include_bytes!("../icons/letter/recording-3-dark.rgba").as_slice(),
+    include_bytes!("../icons/letter/recording-4-dark.rgba").as_slice(),
+    include_bytes!("../icons/letter/recording-5-dark.rgba").as_slice(),
+    include_bytes!("../icons/letter/recording-6-dark.rgba").as_slice(),
+    include_bytes!("../icons/letter/recording-7-dark.rgba").as_slice()
 ];
 const WORKING: [&[u8]; 12] = [
     include_bytes!("../icons/letter/working-0.rgba").as_slice(),
@@ -41,7 +53,7 @@ const WORKING: [&[u8]; 12] = [
     include_bytes!("../icons/letter/working-11.rgba").as_slice()
 ];
 #[cfg(target_os = "macos")]
-const DOCK: [&[u8]; 22] = [
+const DOCK: [&[u8]; 23] = [
     include_bytes!("../icons/letter/dock-idle.png").as_slice(),
     include_bytes!("../icons/letter/dock-paused.png").as_slice(),
     include_bytes!("../icons/letter/dock-recording-0.png").as_slice(),
@@ -63,7 +75,8 @@ const DOCK: [&[u8]; 22] = [
     include_bytes!("../icons/letter/dock-working-8.png").as_slice(),
     include_bytes!("../icons/letter/dock-working-9.png").as_slice(),
     include_bytes!("../icons/letter/dock-working-10.png").as_slice(),
-    include_bytes!("../icons/letter/dock-working-11.png").as_slice()
+    include_bytes!("../icons/letter/dock-working-11.png").as_slice(),
+    include_bytes!("../icons/letter/dock-call.png").as_slice()
 ];
 
 fn mode_from(value: u8) -> Mode {
@@ -93,13 +106,19 @@ fn frame(mode: Mode, step: usize, level: f32) -> (&'static [u8], usize) {
     }
 }
 
-fn tray_frame(mode: Mode, step: usize, level: f32, call: bool) -> (&'static [u8], usize) {
+fn tray_frame(mode: Mode, step: usize, level: f32, call: bool, dark: bool) -> (&'static [u8], usize) {
     let (rgba, dock) = frame(mode, step, level);
     if mode == Mode::Idle && call {
-        (include_bytes!("../icons/letter/idle-call.rgba"), dock)
+        (if dark { include_bytes!("../icons/letter/idle-call-dark.rgba") } else { include_bytes!("../icons/letter/idle-call.rgba") }, 22)
+    } else if mode == Mode::Recording && dark {
+        (LIVE_DARK[dock - 2], dock)
     } else {
         (rgba, dock)
     }
+}
+
+fn uses_template(mode: Mode, call: bool) -> bool {
+    mode != Mode::Recording && !(mode == Mode::Idle && call)
 }
 
 pub fn call_state_changed<R: Runtime>(app: &AppHandle<R>) { refresh(app); }
@@ -126,6 +145,24 @@ pub fn initialize<R: Runtime>(app: &AppHandle<R>) {
         }
     });
     refresh(app);
+    // Static meeting artwork must also follow a menu-bar appearance change.
+    // Query the status button's actual appearance, independent of app theme.
+    #[cfg(target_os = "macos")]
+    {
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                let next = handle.clone();
+                if handle.run_on_main_thread(move || {
+                    if let Some(tray) = next.tray_by_id("main-tray") {
+                        let dark = menu_bar_is_dark(&tray);
+                        if MENU_BAR_DARK.swap(dark, Ordering::SeqCst) != dark { refresh(&next); }
+                    }
+                }).is_err() { break; }
+            }
+        });
+    }
 }
 
 pub fn recording_state<R: Runtime>(app: &AppHandle<R>, state: &crate::tray::RecordingState) {
@@ -147,7 +184,7 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let mode = visual_mode(mode_from(BACKEND.load(Ordering::SeqCst)), FRONTEND_BUSY.load(Ordering::SeqCst));
     let reduced = REDUCE_MOTION.load(Ordering::SeqCst);
-    let name = "Tetro";
+    let name = crate::app_profile::NAME;
     let status = match mode { Mode::Idle if crate::call_detection::call_active() => "Microphone in use · Record this call", Mode::Idle => "Ready", Mode::Starting => "Starting recording", Mode::Recording => "Recording", Mode::Paused => "Recording paused", Mode::Working => "Processing recording" };
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(format!("{name} · {status}")));
@@ -180,15 +217,44 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
 
 fn show_frame<R: Runtime>(app: &AppHandle<R>, mode: Mode, step: usize, level: f32, generation: u64, dock: bool) {
     let handle = app.clone();
-    let (rgba, dock_index) = tray_frame(mode, step, level, crate::call_detection::call_active());
+    let call = crate::call_detection::call_active();
     let _ = app.run_on_main_thread(move || {
         if GENERATION.load(Ordering::SeqCst) != generation { return; }
         if let Some(tray) = handle.tray_by_id("main-tray") {
+            let dark = menu_bar_is_dark(&tray);
+            #[cfg(target_os = "macos")]
+            MENU_BAR_DARK.store(dark, Ordering::SeqCst);
+            let (rgba, _) = tray_frame(mode, step, level, call, dark);
             let _ = tray.set_icon(Some(tauri::image::Image::new(rgba, 36, 36)));
-            let _ = tray.set_icon_as_template(true);
+            let _ = tray.set_icon_as_template(uses_template(mode, call));
         }
-        if dock { set_dock_icon(dock_index); }
+        if dock { set_dock_icon(tray_frame(mode, step, level, call, false).1); }
     });
+}
+
+#[cfg(not(target_os = "macos"))]
+fn menu_bar_is_dark<R: Runtime>(_: &tauri::tray::TrayIcon<R>) -> bool { false }
+
+#[cfg(target_os = "macos")]
+fn menu_bar_is_dark<R: Runtime>(tray: &tauri::tray::TrayIcon<R>) -> bool {
+    use objc::{class, msg_send, sel, sel_impl};
+    use objc::runtime::{Object, YES};
+    tray.with_inner_tray_icon(|inner| {
+        let Some(item) = inner.ns_status_item() else { return false; };
+        let item = std::ptr::from_ref(&*item).cast::<Object>() as *mut Object;
+        objc::rc::autoreleasepool(|| unsafe {
+            let button: *mut Object = msg_send![item, button];
+            if button.is_null() { return false; }
+            let appearance: *mut Object = msg_send![button, effectiveAppearance];
+            let light: *mut Object = msg_send![class!(NSString), stringWithUTF8String: b"NSAppearanceNameAqua\0".as_ptr()];
+            let dark: *mut Object = msg_send![class!(NSString), stringWithUTF8String: b"NSAppearanceNameDarkAqua\0".as_ptr()];
+            let objects = [light, dark];
+            let names: *mut Object = msg_send![class!(NSArray), arrayWithObjects: objects.as_ptr() count: objects.len()];
+            let best: *mut Object = msg_send![appearance, bestMatchFromAppearancesWithNames: names];
+            let matches: objc::runtime::BOOL = msg_send![best, isEqualToString: dark];
+            matches == YES
+        })
+    }).unwrap_or(false)
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -241,13 +307,27 @@ mod tests {
     use super::*;
     #[test]
     fn call_hint_uses_the_same_canvas_and_never_overrides_recording() {
-        let (call, dock) = tray_frame(Mode::Idle, 0, 0.0, true);
+        let (call, dock) = tray_frame(Mode::Idle, 0, 0.0, true, false);
         assert_eq!(call.len(), 36 * 36 * 4);
-        assert_eq!(dock, 0);
+        assert_eq!(dock, 22);
         assert_ne!(call, frame(Mode::Idle, 0, 0.0).0);
         for mode in [Mode::Starting, Mode::Recording, Mode::Paused, Mode::Working] {
-            assert_eq!(tray_frame(mode, 3, 0.5, true), frame(mode, 3, 0.5));
+            assert_eq!(tray_frame(mode, 3, 0.5, true, false), frame(mode, 3, 0.5));
         }
+    }
+    #[test]
+    fn colored_states_choose_readable_variants_and_keep_their_dots() {
+        for mode in [Mode::Idle, Mode::Recording] {
+            let (light, dock) = tray_frame(mode, 0, 1.0, true, false);
+            let (dark, dark_dock) = tray_frame(mode, 0, 1.0, true, true);
+            assert_ne!(light, dark);
+            assert_eq!(dock, dark_dock);
+            assert!(!uses_template(mode, true));
+            assert!(light.chunks_exact(4).any(|p| p[0] != p[1] && p[3] > 0));
+            assert!(dark.chunks_exact(4).any(|p| p[0] != p[1] && p[3] > 0));
+        }
+        for mode in [Mode::Paused, Mode::Working, Mode::Starting] { assert!(uses_template(mode, true)); }
+        assert!(uses_template(Mode::Idle, false));
     }
     #[test]
     fn native_recording_and_pause_win_over_frontend_processing() {

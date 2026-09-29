@@ -234,7 +234,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
           <div className="tetro-lcd-tags"><i className="tetro-lamp" aria-hidden="true" /><span className="tetro-transport-status" role="status">{status}</span><i className="tetro-lcd-tag">48kHz</i>{markCount > 0 && <i className="tetro-lcd-tag is-marks" title={`${markCount} marked ${markCount === 1 ? 'moment' : 'moments'}`}>◆ {markCount}</i>}<i className="tetro-lcd-tag" data-on={isRecording || undefined}>Rec</i></div>
         </div>
       </div>
-      <DeckMeter active={isRecording && !isPaused} />
+      <DeckMeter active={isRecording && !isPaused} disabled={busy} />
     </div>
   </>;
 };

@@ -19,6 +19,7 @@ pub mod ffmpeg_mixer;  // NEW: FFmpeg-style adaptive audio mixer
 pub mod recording_state;
 pub mod pipeline;
 pub mod recording_levels;
+pub mod input_controls;
 pub mod stream;
 pub mod recording_manager;
 pub mod recording_commands;
@@ -119,4 +120,3 @@ pub use decoder::{decode_audio_file, DecodedAudio};
 
 // Export audio constants
 pub use constants::AUDIO_EXTENSIONS;
-

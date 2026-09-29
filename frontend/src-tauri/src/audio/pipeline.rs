@@ -102,6 +102,11 @@ impl AudioMixerRingBuffer {
         self.system_buffer.len() >= self.window_size_samples
     }
 
+    fn silence_muted_inputs(&mut self, inputs: super::input_controls::InputState) {
+        inputs.apply(&DeviceType::Microphone, self.mic_buffer.make_contiguous());
+        inputs.apply(&DeviceType::System, self.system_buffer.make_contiguous());
+    }
+
     fn extract_window(&mut self) -> Option<(Vec<f32>, Vec<f32>)> {
         if !self.can_mix() {
             return None;
@@ -408,6 +413,10 @@ impl AudioCapture {
         } else {
             data.to_vec()
         };
+        // Gate before resampling/filtering so muted sound cannot accumulate in
+        // processor history, and keep the same number of samples for sync.
+        let inputs = super::input_controls::state();
+        inputs.apply(&self.device_type, &mut mono_data);
         super::recording_levels::record(&self.device_type, &mono_data);
 
         // CRITICAL FIX: Resample to 48kHz if device uses different sample rate
@@ -584,6 +593,10 @@ impl AudioCapture {
                 }
             }
         }
+
+        // Suppress filter/resampler tails and a mute issued during this callback.
+        inputs.apply(&self.device_type, &mut mono_data);
+        super::input_controls::state().apply(&self.device_type, &mut mono_data);
 
         // Create audio chunk with stream-specific timestamp (get ID first for logging)
         let chunk_id = self.chunk_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -844,10 +857,16 @@ impl AudioPipeline {
                     // Microphone audio is already normalized at capture level (AudioCapture)
                     // System audio remains raw
                     self.ring_buffer.add_samples(chunk.device_type.clone(), chunk.data);
+                    self.ring_buffer.silence_muted_inputs(super::input_controls::state());
 
                     // STEP 2: Mix audio in fixed windows when both streams have sufficient data
                     while self.ring_buffer.can_mix() {
-                        if let Some((mic_window, sys_window)) = self.ring_buffer.extract_window() {
+                        if let Some((mut mic_window, mut sys_window)) = self.ring_buffer.extract_window() {
+                            // Also gate queued/buffered samples. Both saved audio
+                            // and VAD/transcription receive this same muted mix.
+                            let inputs = super::input_controls::state();
+                            inputs.apply(&DeviceType::Microphone, &mut mic_window);
+                            inputs.apply(&DeviceType::System, &mut sys_window);
                             // Simple mixing without aggressive ducking
                             let mixed_clean = self.mixer.mix_window(&mic_window, &sys_window);
 
@@ -1106,6 +1125,24 @@ impl Default for AudioPipelineManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn muted_buffer_stays_silent_after_unmute_while_other_input_keeps_playing() {
+        let mut buffer = AudioMixerRingBuffer::new(48000);
+        let count = buffer.window_size_samples;
+        buffer.add_samples(DeviceType::Microphone, vec![0.3; count / 2]);
+        buffer.add_samples(DeviceType::System, vec![0.2; count]);
+        buffer.silence_muted_inputs(super::super::input_controls::InputState {
+            microphone_muted: true, system_muted: false, revision: 1,
+        });
+        // Old partial mic samples cannot reappear when unmuted.
+        buffer.add_samples(DeviceType::Microphone, vec![0.4; count / 2]);
+        let (mic, system) = buffer.extract_window().unwrap();
+        let mixed = ProfessionalAudioMixer::new(48000).mix_window(&mic, &system);
+        assert_eq!(mixed.len(), count);
+        assert!(mixed[..count / 2].iter().all(|x| (*x - 0.2).abs() < 1e-6));
+        assert!(mixed[count / 2..].iter().all(|x| (*x - 0.6).abs() < 1e-6));
+    }
 
     #[test]
     fn test_live_vad_redemption_matches_pro_policy() {

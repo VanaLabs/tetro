@@ -235,12 +235,13 @@ impl RecordingState {
         *self.audio_sender.lock().unwrap() = Some(sender);
     }
 
-    pub fn send_audio_chunk(&self, chunk: AudioChunk) -> Result<()> {
+    pub fn send_audio_chunk(&self, mut chunk: AudioChunk) -> Result<()> {
         // Don't send audio chunks when paused
         if self.is_paused() {
             return Ok(()); // Silently discard chunks while paused
         }
 
+        super::input_controls::state().apply(&chunk.device_type, &mut chunk.data);
         if let Some(sender) = self.audio_sender.lock().unwrap().as_ref() {
             sender.send(chunk).map_err(|_| anyhow::anyhow!("Failed to send audio chunk"))?;
 

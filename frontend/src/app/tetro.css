@@ -368,11 +368,18 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 .tetro-transport { min-height:76px; display:flex; align-items:center; gap:16px; padding:10px 20px; flex-shrink:0; background:var(--tetro-paper); border-top:1px solid var(--tetro-line); }
 .tetro-deck { display:flex; align-items:center; gap:14px; min-width:0; flex:1; }
 /* Always-visible, independently measured microphone and computer audio. */
-.tetro-grille { flex:1; min-width:112px; height:48px; display:flex; flex-direction:column; justify-content:center; gap:7px; }
+.tetro-grille { flex:1; min-width:112px; display:flex; flex-direction:column; justify-content:center; gap:5px; }
 .tetro-meter-channel { min-width:0; display:flex; align-items:center; gap:8px; }
 .tetro-meter-label { display:flex; align-items:center; gap:5px; color:var(--tetro-muted); }
 .tetro-meter-label svg { width:13px; height:13px; flex-shrink:0; }
 .tetro-meter-label>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.tetro-input-toggle { display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px; border:1px solid var(--tetro-line-strong); border-radius:7px; background:var(--tetro-panel); color:var(--tetro-ink); cursor:pointer; transition:background .15s,border-color .15s,color .15s; }
+.tetro-input-toggle svg { width:16px; height:16px; }
+.tetro-input-toggle:hover:not(:disabled) { background:var(--tetro-selected); border-color:var(--tetro-ink); }
+.tetro-input-toggle:focus-visible { outline:2px solid var(--tetro-ink); outline-offset:2px; }
+.tetro-input-toggle[aria-pressed=true] { color:var(--tetro-red); border-color:var(--tetro-red); }
+.tetro-input-toggle:disabled { opacity:.45; cursor:default; }
+.tetro-meter-channel[data-muted] .tetro-meter-row { opacity:.4; }
 .tetro-meter-row { min-width:0; display:flex; flex:1; gap:3px; height:5px; }
 .tetro-meter-row i { flex:1; min-width:2px; border-radius:1px; background:var(--tetro-line-strong); transition:background .1s,box-shadow .1s; }
 .tetro-meter-row i[data-on] { background:#3fa36b; box-shadow:0 0 3px rgba(63,163,107,.4); }

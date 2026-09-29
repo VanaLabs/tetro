@@ -74,6 +74,8 @@ commands.allow = [
   "resume_recording",
   "is_recording_paused",
   "get_recording_state",
+  "get_recording_inputs",
+  "set_recording_input_muted",
   "get_meeting_folder_path",
   "get_transcript_history",
   "get_recording_meeting_name",

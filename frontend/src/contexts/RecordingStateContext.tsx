@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { recordingService } from '@/services/recordingService';
 import { toast } from 'sonner';
+import { useRecordingInputs } from '@/hooks/useRecordingInputs';
 
 /**
  * Recording state synchronized with backend
@@ -37,7 +38,7 @@ interface RecordingState {
   statusMessage?: string;  // Optional message for current status
 }
 
-interface RecordingStateContextType extends RecordingState {
+interface RecordingStateContextType extends RecordingState, ReturnType<typeof useRecordingInputs> {
   // NEW: Setters for status management
   setStatus: (status: RecordingStatus, message?: string) => void;
 
@@ -59,6 +60,7 @@ export const useRecordingState = () => {
 };
 
 export function RecordingStateProvider({ children }: { children: React.ReactNode }) {
+  const inputControls = useRecordingInputs();
   const [state, setState] = useState<RecordingState>({
     isRecording: false,
     isPaused: false,
@@ -345,12 +347,13 @@ export function RecordingStateProvider({ children }: { children: React.ReactNode
   // NEW: Computed helpers from status
   const contextValue = useMemo(() => ({
     ...state,
+    ...inputControls,
     setStatus,
     isStopping: state.status === RecordingStatus.STOPPING,
     isProcessing: state.status === RecordingStatus.PROCESSING_TRANSCRIPTS,
     isSaving: state.status === RecordingStatus.SAVING,
     isStartingRecording: state.status === RecordingStatus.STARTING,
-  }), [state, setStatus]);
+  }), [state, setStatus, inputControls]);
 
   return (
     <RecordingStateContext.Provider value={contextValue}>

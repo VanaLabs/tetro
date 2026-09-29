@@ -17,11 +17,11 @@ reserved separately. See [BRAND.md](BRAND.md) before distributing a fork.
 
 ## Download
 
-[**Download Tetro 9.1.2 for Apple Silicon Macs**](https://github.com/VanaLabs/tetro/releases/download/v9.1.2/Tetro_9.1.2_aarch64.dmg)
+[**Download Tetro 9.1.4 for Apple Silicon Macs**](https://github.com/VanaLabs/tetro/releases/download/v9.1.4/Tetro_9.1.4_aarch64.dmg)
 
 ## Install on your Mac
 
-1. Download **Tetro_9.1.2_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
+1. Download **Tetro_9.1.4_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
 2. Open the downloaded DMG, then **drag Tetro onto Applications** in that window. Wait for the copy to finish.
 3. Open **Finder → Applications → Tetro**. You can eject the Tetro disk image afterward.
 4. If macOS says Apple cannot check Tetro or the developer cannot be verified, dismiss that message with **Done** (or **OK**, depending on macOS). Keep the app in Applications.

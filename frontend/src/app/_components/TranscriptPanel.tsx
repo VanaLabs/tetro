@@ -67,7 +67,7 @@ export function TranscriptPanel({
   );
 
   return <div ref={transcriptContainerRef} className="tetro-home-panel tetro-sheet">
-    <div className="tetro-pane-toolbar tetro-live-toolbar"><span>{transcripts.length ? `${transcripts.length} ${transcripts.length === 1 ? 'line' : 'lines'} so far` : isRecording ? (isPaused ? 'Paused' : 'Listening…') : 'New recording'}</span>
+    <div className="tetro-pane-toolbar tetro-live-toolbar"><span>{transcripts.length ? `${transcripts.length} ${transcripts.length === 1 ? 'line' : 'lines'} so far` : isRecording ? (isPaused ? 'Paused' : 'Listening…') : ''}</span>
       {transcripts.length > 0 && <Button variant="outline" size="sm" onClick={copyTranscript} title="Copy transcript"><Copy />Copy</Button>}
       {(isRecording || transcripts.length > 0) && <>{isPrimaryLanguageSelectionAvailable(transcriptModelConfig.provider) && <Button variant="outline" size="sm" onClick={() => showModal('languageSettings')} title="Transcription language"><GlobeIcon />Language</Button>}
       <Button variant="outline" size="sm" onClick={() => showModal('modelSelector')} title="Transcription model"><SlidersHorizontal />{transcriptModelConfig.provider === 'parakeet' ? getModelDisplayName(transcriptModelConfig.model) : transcriptModelConfig.model ? whisperLabel(transcriptModelConfig.model) : 'Choose model'}</Button></>}
