@@ -47,5 +47,6 @@ result=('Tetro — Open-source notices\n\n'
         'are reserved to Vana Labs. See BRAND.md in the source repository.\n\n'
         'Project code license\n\n'+(ROOT/'LICENSE.md').read_text()+'\n\nDependency notices\n')
 for text,names in groups.values(): result+='\n'+'─'*64+'\n'+'\n'.join(sorted(set(names)))+'\n\n'+text+'\n'
+result += '\nFFmpeg 8.0.3 — VanaLabs audio-only build (LGPL-2.1-or-later)\nSource and build recipe: https://github.com/VanaLabs/tetro/releases/tag/ffmpeg-8.0.3-tetro.1\n\n' + (FRONT/'scripts/ffmpeg/COPYING.LGPLv2.1').read_text()
 (FRONT/'public/tetro/licenses.txt').write_text(result)
 print(f'Collected {len(groups)} distinct notices from {len(seen)} JS packages and installed Cargo dependencies; {len(missing)} optional/missing JS dependencies. Review platform binaries and bundled models separately before release.')

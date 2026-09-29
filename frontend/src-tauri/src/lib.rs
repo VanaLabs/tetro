@@ -1,3 +1,6 @@
+mod model_integrity;
+mod verified_ffmpeg;
+mod recording_paths;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex as StdMutex;
@@ -293,51 +296,15 @@ fn get_transcription_status() -> TranscriptionStatus {
 }
 
 #[tauri::command]
-fn read_audio_file(file_path: String) -> Result<Vec<u8>, String> {
-    match std::fs::read(&file_path) {
-        Ok(data) => Ok(data),
-        Err(e) => Err(format!("Failed to read audio file: {}", e)),
-    }
-}
-
-#[tauri::command]
-async fn save_transcript(file_path: String, content: String) -> Result<(), String> {
-    log_info!("Saving transcript to: {}", file_path);
-
-    // Ensure parent directory exists
-    if let Some(parent) = std::path::Path::new(&file_path).parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory: {}", e))?;
-        }
-    }
-
-    // Write content to file
-    std::fs::write(&file_path, content)
-        .map_err(|e| format!("Failed to write transcript: {}", e))?;
-
-    log_info!("Transcript saved successfully");
-    Ok(())
-}
-
-#[tauri::command]
-async fn save_markdown_file(file_path: String, content: String) -> Result<(), String> {
-    log_info!("Saving Markdown export to: {}", file_path);
-
-    let path = std::path::Path::new(&file_path);
-    if !path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
-    {
-        return Err("Markdown exports must use the .md file extension".to_string());
-    }
-
-    std::fs::write(path, content)
-        .map_err(|error| format!("Failed to write Markdown export: {}", error))?;
-
-    log_info!("Markdown export saved successfully");
-    Ok(())
+async fn save_markdown_file<R: Runtime>(app: AppHandle<R>, file_name: String, content: String) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let name = std::path::Path::new(&file_name).file_name().and_then(|n| n.to_str()).unwrap_or("meeting.md");
+    let name = if name.ends_with(".md") { name.to_string() } else { format!("{name}.md") };
+    let Some(file) = app.dialog().file().set_file_name(&name).add_filter("Markdown", &["md"]).blocking_save_file() else { return Ok(None); };
+    let path = file.into_path().map_err(|e| e.to_string())?;
+    if path.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) { return Err("Choose a file rather than a symbolic link.".into()); }
+    std::fs::write(&path, content).map_err(|e| format!("Could not export Markdown: {e}"))?;
+    Ok(Some(path.to_string_lossy().into_owned()))
 }
 
 // Audio level monitoring commands
@@ -709,8 +676,6 @@ pub fn run() {
             stop_recording,
             is_recording,
             get_transcription_status,
-            read_audio_file,
-            save_transcript,
             save_markdown_file,
             startup::api_startup_issue,
             startup::api_retry_startup,
@@ -795,9 +760,6 @@ pub fn run() {
             groq::groq::get_groq_models,
             api::api_get_meetings,
             api::api_search_transcripts,
-            api::api_get_profile,
-            api::api_save_profile,
-            api::api_update_profile,
             api::api_get_model_config,
             api::api_save_model_config,
             api::api_get_api_key,
@@ -815,8 +777,6 @@ pub fn run() {
             api::api_save_meeting_title,
             api::api_save_transcript,
             api::open_meeting_folder,
-            api::test_backend_connection,
-            api::debug_backend_connection,
             api::open_external_url,
             // Custom OpenAI commands
             api::api_save_custom_openai_config,
@@ -849,6 +809,8 @@ pub fn run() {
             meeting_media::api_meeting_audio_path,
             transcript_edits::api_update_transcript_lines,
             meeting_edits::api_get_meeting_edits,
+            meeting_trash::api_pending_local_cleanup,
+            meeting_trash::api_ack_local_cleanup,
             meeting_trash::api_move_to_trash,
             meeting_trash::api_list_trash,
             meeting_trash::api_restore_trash,

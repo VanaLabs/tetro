@@ -1,5 +1,6 @@
 'use client'
 
+import { DeletedDraftCleanup } from '@/components/tetro/DeletedDraftCleanup'
 import { StartupGuard } from '@/components/tetro/StartupGuard'
 import { NativeActions } from '@/components/tetro/NativeActions'
 import { ModelActivationBridge } from '@/components/tetro/ModelActivationBridge'
@@ -268,6 +269,7 @@ export default function RootLayout({
       </head>
       <body className={`${sourceSans3.variable} ${tetroMono.variable} font-sans antialiased tetro-app`}>
         <StartupGuard><ThemeProvider>
+          <DeletedDraftCleanup />
             <RecordingStateProvider>
               <TetroIdentityBridge />
               <SilenceWatch />

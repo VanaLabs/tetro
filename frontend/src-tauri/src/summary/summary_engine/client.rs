@@ -170,6 +170,7 @@ pub async fn generate_with_builtin(
 
     // Resolve model path with caching (avoids repeated filesystem I/O)
     let model_path = get_cached_model_path(app_data_dir, model_name)?;
+    crate::model_integrity::summary(&model_path)?;
 
     // Apply model-specific chat template
     let formatted_prompt =

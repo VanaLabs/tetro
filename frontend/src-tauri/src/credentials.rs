@@ -186,16 +186,29 @@ async fn purge_database_history(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 }
 
 pub async fn migrate_legacy(pool: &SqlitePool) -> Result<(), sqlx::Error> {
+    migrate_legacy_with(pool, Arc::new(OsStore)).await
+}
+
+async fn migrate_legacy_with(pool: &SqlitePool, store: Arc<dyn SecretStore>) -> Result<(), sqlx::Error> {
     let mut slots = Vec::new();
     for p in ["openai", "claude", "groq", "openrouter", "ollama"] { slots.push(Slot::summary(p)?.unwrap()); }
     for p in ["localWhisper", "deepgram", "elevenLabs", "groq", "openai"] { slots.push(Slot::transcription(p)?.unwrap()); }
-    let custom: Option<String> = sqlx::query_scalar::<_, Option<String>>("SELECT customOpenAIConfig FROM settings WHERE id = '1'").fetch_optional(pool).await?.flatten();
+    // Legacy schemas may predate individual providers. Only touch known existing columns.
+    let mut supported = Vec::new();
+    for slot in slots {
+        let exists: i64 = sqlx::query_scalar("SELECT count(*) FROM pragma_table_info(?) WHERE name=?")
+            .bind(slot.table).bind(slot.column).fetch_one(pool).await?;
+        if exists > 0 { supported.push(slot); }
+    }
+    let mut slots = supported;
+    let custom_exists: i64 = sqlx::query_scalar("SELECT count(*) FROM pragma_table_info('settings') WHERE name='customOpenAIConfig'").fetch_one(pool).await?;
+    let custom: Option<String> = if custom_exists > 0 { sqlx::query_scalar::<_, Option<String>>("SELECT customOpenAIConfig FROM settings WHERE id = '1'").fetch_optional(pool).await?.flatten() } else { None };
     if let Some(json) = custom {
         let value: serde_json::Value = serde_json::from_str(&json).map_err(|_| error("Invalid custom provider settings"))?;
         if let Some(endpoint) = value["endpoint"].as_str() { slots.push(Slot::custom(endpoint)); }
     }
     for slot in slots {
-        if legacy(pool, &slot).await?.is_some() { read(pool, slot).await?; }
+        if legacy(pool, &slot).await?.is_some() { read_with(pool, slot, store.clone()).await?; }
     }
     let table: i64 = sqlx::query_scalar("SELECT count(*) FROM sqlite_master WHERE name='credential_cleanup'").fetch_one(pool).await?;
     if table > 0 {
@@ -203,6 +216,17 @@ pub async fn migrate_legacy(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         if pending != 0 { purge_database_history(pool).await?; }
     }
     Ok(())
+}
+
+/// Clean only the app-owned legacy copy; callers must never pass the external import source.
+pub async fn cleanup_legacy_copy(path: &std::path::Path) -> Result<(), sqlx::Error> {
+    if !path.exists() { return Ok(()); }
+    if path.symlink_metadata()?.file_type().is_symlink() { return Err(error("Legacy database copy cannot be a symbolic link")); }
+    let options=sqlx::sqlite::SqliteConnectOptions::new().filename(path).create_if_missing(false);
+    let pool=sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect_with(options).await?;
+    let result=migrate_legacy(&pool).await;
+    pool.close().await;
+    result
 }
 
 #[cfg(test)]
@@ -290,6 +314,24 @@ mod tests {
             assert!(!bytes.windows(secret.len()).any(|window| window == secret.as_bytes()));
         }
         pool.close().await;
+    }
+    #[tokio::test]
+    async fn both_active_and_legacy_copies_are_cleaned_and_denial_retains_secret() {
+        let root=tempfile::tempdir().unwrap();
+        let store=Arc::new(MemoryStore::default());
+        for name in ["meeting_minutes.sqlite","meeting_minutes.db"] {
+            let path=root.path().join(name);
+            let pool=sqlx::sqlite::SqlitePoolOptions::new().max_connections(1).connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(&path).create_if_missing(true)).await.unwrap();
+            sqlx::query("CREATE TABLE settings(id TEXT PRIMARY KEY, openaiApiKey TEXT)").execute(&pool).await.unwrap();
+            sqlx::query("INSERT INTO settings VALUES('1','test-legacy-copy-secret')").execute(&pool).await.unwrap();
+            let denied=Arc::new(MemoryStore{fail_reads:true,..Default::default()});
+            assert!(migrate_legacy_with(&pool,denied).await.is_err());
+            let retained:Option<String>=sqlx::query_scalar("SELECT openaiApiKey FROM settings").fetch_one(&pool).await.unwrap();
+            assert!(retained.is_some());
+            migrate_legacy_with(&pool,store.clone()).await.unwrap();
+            pool.close().await;
+            assert!(!std::fs::read(&path).unwrap().windows(b"test-legacy-copy-secret".len()).any(|s|s==b"test-legacy-copy-secret"));
+        }
     }
     #[cfg(target_os = "macos")]
     #[test]

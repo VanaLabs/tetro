@@ -37,7 +37,7 @@ pub fn request_screen_recording_permission() -> Result<()> {
 
     // Open System Settings to Privacy & Security page
     // Note: There's no direct URL for Audio Capture, so we open the main Privacy page
-    let result = Command::new("open")
+    let result = Command::new("/usr/bin/open")
         .arg("x-apple.systempreferences:com.apple.preference.security")
         .spawn();
 

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
-use reqwest::Client;
 use regex::Regex;
 use once_cell::sync::Lazy;
 
@@ -141,8 +140,8 @@ async fn fetch_model_info(
     model_name: &str,
     endpoint: Option<&str>,
 ) -> Result<ModelMetadata, String> {
-    let client = Client::new();
-    let base_url = endpoint.unwrap_or("http://localhost:11434");
+    let client = crate::network_security::client()?;
+    let base_url = crate::network_security::endpoint(endpoint.filter(|s| !s.trim().is_empty()).unwrap_or("http://localhost:11434"))?;
     let url = format!("{}/api/show", base_url);
 
     let payload = serde_json::json!({

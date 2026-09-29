@@ -107,6 +107,7 @@ impl SidecarManager {
     /// Resolve the path to llama-helper binary
     fn resolve_helper_binary() -> Result<PathBuf> {
         // 1. Check environment variable (dev mode or manual override)
+        #[cfg(debug_assertions)]
         if let Ok(env_path) = std::env::var("MEETILY_LLAMA_HELPER") {
             if !env_path.is_empty() {
                 let path = PathBuf::from(env_path);
@@ -124,8 +125,7 @@ impl SidecarManager {
                 log::info!("Searching for llama-helper relative to executable: {}", exe_dir.display());
                 
                 // Get the target triple (same logic as before)
-                let target_triple = std::env::var("TARGET")
-                    .unwrap_or_else(|_| {
+                let target_triple = {
                         #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
                         { "x86_64-unknown-linux-gnu".to_string() }
                         #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
@@ -144,7 +144,7 @@ impl SidecarManager {
                             all(target_os = "windows", any(target_arch = "x86_64", target_arch = "aarch64"))
                         )))]
                         { "unknown".to_string() }
-                    });
+                    };
 
                 let binary_name = if cfg!(windows) {
                     format!("llama-helper-{}.exe", target_triple)
@@ -159,8 +159,11 @@ impl SidecarManager {
                     return Ok(bundled);
                 }
 
+                let bundled_plain=exe_dir.join(if cfg!(windows) { "llama-helper.exe" } else { "llama-helper" });
+                if bundled_plain.is_file() { return Ok(bundled_plain); }
                 // Fuzzy match in exe dir
                 log::info!("Attempting fuzzy match in exe dir: {}", exe_dir.display());
+                #[cfg(debug_assertions)]
                 if let Ok(entries) = std::fs::read_dir(exe_dir) {
                     for entry in entries.flatten() {
                         let path = entry.path();
@@ -176,6 +179,7 @@ impl SidecarManager {
         }
 
         // 3. Check bundled resources (RESOURCE_DIR) - Fallback
+        #[cfg(debug_assertions)]
         if let Ok(resource_dir) = std::env::var("RESOURCE_DIR") {
             log::info!("Searching for llama-helper in RESOURCE_DIR: {}", resource_dir);
             let resource_path = PathBuf::from(&resource_dir);
@@ -232,6 +236,7 @@ impl SidecarManager {
         }
 
         // 3. Fallback for dev: try relative paths from workspace (no target triple in dev builds)
+        #[cfg(debug_assertions)]
         if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
             let project_root = PathBuf::from(&manifest_dir)
                 .parent()
@@ -284,7 +289,7 @@ impl SidecarManager {
         log::info!("Model path: {}", model_path.display());
 
         #[cfg(unix)]
-        let mut command = tokio::process::Command::new("nice");
+        let mut command = tokio::process::Command::new("/usr/bin/nice");
         
         #[cfg(not(unix))]
         let mut command = tokio::process::Command::new(&self.helper_binary_path);

@@ -248,7 +248,9 @@ async fn resolve_meeting_folder(
         return Ok(MeetingFolderResolution::NoFolder);
     };
 
-    Ok(MeetingFolderResolution::Folder(PathBuf::from(folder_path)))
+    let folder = crate::recording_paths::folder(std::path::Path::new(&folder_path))?;
+    crate::recording_paths::child(&folder, "metadata.json")?;
+    Ok(MeetingFolderResolution::Folder(folder))
 }
 
 fn blocknote_has_visible_text(value: &serde_json::Value) -> bool {

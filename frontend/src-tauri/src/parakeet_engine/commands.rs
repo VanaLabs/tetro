@@ -558,7 +558,7 @@ pub async fn open_parakeet_models_folder() -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
+        std::process::Command::new("/usr/bin/open")
             .arg(&folder_path)
             .spawn()
             .map_err(|e| format!("Failed to open folder: {}", e))?;

@@ -96,7 +96,7 @@ pub async fn open_app_permission_settings(permission: String) -> Result<(), Stri
             "notifications" => "x-apple.systempreferences:com.apple.preference.notifications",
             _ => return Err("Unknown permission".into()),
         };
-        let status = std::process::Command::new("open").arg(url).status().map_err(|_| "Could not open System Settings")?;
+        let status = std::process::Command::new("/usr/bin/open").arg(url).status().map_err(|_| "Could not open System Settings")?;
         if !status.success() { return Err("Could not open System Settings".into()); }
         Ok(())
     }

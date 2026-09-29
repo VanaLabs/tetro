@@ -4,7 +4,6 @@ import { BlockNoteSummaryViewRef } from '@/components/AISummary/BlockNoteSummary
 import { toast } from 'sonner';
 
 import { invoke as invokeTauri } from '@tauri-apps/api/core';
-import { save } from '@tauri-apps/plugin-dialog';
 import { hasVisibleSummaryContent } from '@/lib/summary-content';
 
 const clock = (seconds: number) => {
@@ -276,10 +275,8 @@ export function useCopyOperations({
         toast('Choose Save as PDF in the print window.');
         return;
       }
-      const selectedPath = await save({ defaultPath: getMarkdownExportFilename(meetingTitle), filters: [{ name: 'Markdown', extensions: ['md'] }] });
-      if (!selectedPath) return;
-      const exportPath = /\.md$/i.test(selectedPath) ? selectedPath : `${selectedPath}.md`;
-      await invokeTauri('save_markdown_file', { filePath: exportPath, content: parts.join('\n\n') + '\n' });
+      const exportPath = await invokeTauri<string | null>('save_markdown_file', { fileName: getMarkdownExportFilename(meetingTitle), content: parts.join('\n\n') + '\n' });
+      if (!exportPath) return;
       toast.success('Exported', { description: exportPath });
     } catch (error) {
       console.error('Failed to export summary:', error);

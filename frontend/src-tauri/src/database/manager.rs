@@ -30,7 +30,11 @@ impl DatabaseManager {
             }
         }
 
-        let pool = SqlitePool::connect(tauri_db_path).await?;
+        let pool = sqlx::sqlite::SqlitePoolOptions::new().after_connect(|conn,_| Box::pin(async move {
+            sqlx::query("PRAGMA secure_delete = ON").execute(&mut *conn).await?;
+            sqlx::query("PRAGMA foreign_keys = ON").execute(conn).await?;
+            Ok(())
+        })).connect(tauri_db_path).await?;
 
         sqlx::migrate!("./migrations").run(&pool).await?;
 
@@ -38,6 +42,8 @@ impl DatabaseManager {
         // migration and return an error; they never fall back to using plaintext credentials.
         if let Err(error) = crate::credentials::migrate_legacy(&pool).await {
             log::warn!("Provider credential migration needs attention: {}", error);
+        } else if let Err(error) = crate::credentials::cleanup_legacy_copy(Path::new(backend_db_path)).await {
+            log::warn!("Legacy credential copy cleanup needs attention: {}", error);
         }
 
         Ok(DatabaseManager { pool })

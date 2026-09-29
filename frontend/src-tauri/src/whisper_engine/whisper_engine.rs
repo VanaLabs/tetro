@@ -321,6 +321,7 @@ impl WhisperEngine {
                     // let _suppressor = crate::whisper_engine::StderrSuppressor::new();
 
                     // Load whisper context with hardware-optimized parameters
+                    crate::model_integrity::whisper(&model_info.path)?;
                     WhisperContext::new_with_params(&model_info.path.to_string_lossy(), context_param)
                         .map_err(|e| anyhow!("Failed to load model {}: {}", model_name, e))?
                     // Suppressor dropped here, stderr restored
@@ -828,14 +829,14 @@ impl WhisperEngine {
             }
         } else {
             if cleaned_result != final_result {
-                log::info!("Cleaned repetitive transcription #{}: '{}' -> '{}'", transcription_count, final_result, cleaned_result);
+                log::debug!("Cleaned repetitive transcription #{}", transcription_count);
             }
             // Reduce successful transcription logging frequency
             // Only log every 5th result or significant results (>50 chars) to reduce I/O overhead
             if transcription_count % 5 == 0 || cleaned_result.len() > 50 || duration_seconds > 10.0 {
-                log::info!("Transcription #{} result: '{}'", transcription_count, cleaned_result);
+                log::debug!("Transcription #{} complete", transcription_count);
             } else {
-                perf_debug!("Transcription #{} result: '{}'", transcription_count, cleaned_result);
+                perf_debug!("Transcription #{} complete", transcription_count);
             }
         }
 
@@ -849,6 +850,7 @@ impl WhisperEngine {
     /// Validate if a model file is a valid GGML file by checking its header
     async fn validate_model_file(&self, model_path: &PathBuf) -> Result<()> {
         use tokio::io::AsyncReadExt;
+        crate::model_integrity::whisper(model_path)?;
 
         let mut file = fs::File::open(model_path).await
             .map_err(|e| anyhow!("Failed to open model file: {}", e))?;
@@ -1344,13 +1346,7 @@ mod tests {
         let engine = WhisperEngine::new_with_models_dir(Some(dir.path().to_path_buf())).unwrap();
         let model_path = dir.path().join("ggml-tiny.bin");
 
-        std::fs::write(&model_path, b"ggml\0\0\0\0").unwrap();
-        std::fs::OpenOptions::new()
-            .write(true)
-            .open(&model_path)
-            .unwrap()
-            .set_len(68 * 1024 * 1024)
-            .unwrap();
+        std::fs::copy(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/models/ggml-tiny.bin"), &model_path).unwrap();
 
         engine.discover_models().await.unwrap();
         let active_download = engine.reserve_active_download("tiny").await.unwrap();
@@ -1400,7 +1396,7 @@ mod tests {
 
         assert!(error
             .to_string()
-            .contains("Invalid model file: missing GGML/GGUF magic number"));
+            .contains("fingerprint"));
         assert!(!engine.active_downloads.lock().await.contains_key("tiny"));
         assert!(!model_path.exists());
         assert!(matches!(
@@ -1535,13 +1531,7 @@ mod tests {
         let engine = WhisperEngine::new_with_models_dir(Some(dir.path().to_path_buf())).unwrap();
         let model_path = dir.path().join("ggml-tiny.bin");
 
-        std::fs::write(&model_path, b"ggml\0\0\0\0").unwrap();
-        std::fs::OpenOptions::new()
-            .write(true)
-            .open(&model_path)
-            .unwrap()
-            .set_len(68 * 1024 * 1024)
-            .unwrap();
+        std::fs::copy(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/models/ggml-tiny.bin"), &model_path).unwrap();
 
         engine.discover_models().await.unwrap();
         let active_download = engine.reserve_active_download("tiny").await.unwrap();
@@ -1645,7 +1635,7 @@ mod tests {
         let request = String::from_utf8(request.await.unwrap()).unwrap();
         server.await.unwrap();
 
-        assert!(error.to_string().contains("too small"));
+        assert!(error.to_string().contains("fingerprint"));
         assert!(request.to_ascii_lowercase().contains(&format!(
             "user-agent: tetro/{}",
             env!("CARGO_PKG_VERSION")

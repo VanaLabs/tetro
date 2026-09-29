@@ -15,7 +15,14 @@ const key = process.env.TAURI_SIGNING_PRIVATE_KEY || resolve(homedir(), '.config
 if (!process.env.TAURI_SIGNING_PRIVATE_KEY && !existsSync(key)) throw new Error('Updater signing key is missing. Restore the original release key; do not replace it.');
 if (!process.env.APPLE_SIGNING_IDENTITY && !process.argv.includes('--allow-adhoc')) throw new Error('Set APPLE_SIGNING_IDENTITY to a Developer ID identity, or use --allow-adhoc for distribution without Apple notarization.');
 const target = arch() === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin';
-const env = { ...process.env, TAURI_SIGNING_PRIVATE_KEY: key, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' };
+let signingPassword = process.env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD;
+if (signingPassword === undefined) {
+  const saved = spawnSync('/usr/bin/security', ['find-generic-password', '-s', 'am.vanalabs.tetro.release', '-a', 'updater-key-password', '-w'], { encoding: 'utf8' });
+  if (saved.status !== 0) throw new Error('Updater password is unavailable in Keychain. Unlock Keychain or provide TAURI_SIGNING_PRIVATE_KEY_PASSWORD.');
+  signingPassword = saved.stdout.replace(/\r?\n$/, '');
+  if (!signingPassword) throw new Error('The saved updater password is empty.');
+}
+const env = { ...process.env, TAURI_SIGNING_PRIVATE_KEY: key, TAURI_SIGNING_PRIVATE_KEY_PASSWORD: signingPassword };
 if (!env.DEVELOPER_DIR && existsSync('/Applications/Xcode.app/Contents/Developer')) env.DEVELOPER_DIR = '/Applications/Xcode.app/Contents/Developer';
 const result = spawnSync('pnpm', ['tauri', 'build', '--ci', '--config', 'src-tauri/tauri.release.conf.json'], { cwd: frontend, env, stdio: 'inherit' });
 if (result.status !== 0) process.exit(result.status || 1);

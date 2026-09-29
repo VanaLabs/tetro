@@ -164,7 +164,7 @@ impl IncrementalAudioSaver {
 
             // Use absolute path for FFmpeg (required for safe mode)
             let abs_path = checkpoint_path.canonicalize()?;
-            list_content.push_str(&format!("file '{}'\n", abs_path.display()));
+            list_content.push_str(&crate::recording_paths::concat_entry(&abs_path).map_err(anyhow::Error::msg)?);
         }
 
         std::fs::write(&list_file, list_content)?;
@@ -244,11 +244,15 @@ pub async fn recover_audio_from_checkpoints(
 ) -> Result<AudioRecoveryStatus, String> {
     info!("Starting audio recovery for folder: {}", meeting_folder);
 
-    let folder_path = PathBuf::from(&meeting_folder);
-    let checkpoints_dir = folder_path.join(".checkpoints");
+    let folder_path = crate::recording_paths::folder(std::path::Path::new(&meeting_folder))?;
+    recover_audio_in_folder(folder_path).await
+}
+
+async fn recover_audio_in_folder(folder_path: PathBuf) -> Result<AudioRecoveryStatus,String> {
+    let checkpoints_dir = crate::recording_paths::child(&folder_path, ".checkpoints")?;
 
     // A crash can happen after audio is finalized but before its DB row is saved.
-    let finalized = folder_path.join("audio.mp4");
+    let finalized = crate::recording_paths::child(&folder_path, "audio.mp4")?;
     if finalized.metadata().map(|meta| meta.is_file() && meta.len() > 0).unwrap_or(false) {
         return Ok(AudioRecoveryStatus {
             status: "success".into(), chunk_count: 0, estimated_duration_seconds: 0.0,
@@ -298,20 +302,21 @@ pub async fn recover_audio_from_checkpoints(
     info!("Found {} checkpoint files, estimated duration: {:.2}s", chunk_count, estimated_duration);
 
     // Create FFmpeg concat file
-    let concat_file_path = checkpoints_dir.join("concat_list.txt");
+    let concat_file_path = crate::recording_paths::child(&checkpoints_dir, "concat_list.txt")?;
     let mut concat_content = String::new();
 
     for entry in &checkpoint_files {
         let path = entry.path().canonicalize()
             .map_err(|e| format!("Failed to canonicalize path: {}", e))?;
-        concat_content.push_str(&format!("file '{}'\n", path.display()));
+        if path.parent() != Some(checkpoints_dir.as_path()) { return Err("Checkpoint is outside its recording folder".into()); }
+        concat_content.push_str(&crate::recording_paths::concat_entry(&path)?);
     }
 
     std::fs::write(&concat_file_path, concat_content)
         .map_err(|e| format!("Failed to write concat file: {}", e))?;
 
     // Run FFmpeg to merge chunks
-    let output_path = folder_path.join("audio.mp4");
+    let output_path = crate::recording_paths::child(&folder_path, "audio.mp4")?;
     let output_path_str = output_path.to_str()
         .ok_or("Invalid output path")?
         .to_string();
@@ -386,8 +391,8 @@ pub async fn recover_audio_from_checkpoints(
 pub async fn cleanup_checkpoints(meeting_folder: String) -> Result<(), String> {
     info!("Cleaning up checkpoints for folder: {}", meeting_folder);
 
-    let folder_path = PathBuf::from(&meeting_folder);
-    let checkpoints_dir = folder_path.join(".checkpoints");
+    let folder_path = crate::recording_paths::folder(std::path::Path::new(&meeting_folder))?;
+    let checkpoints_dir = crate::recording_paths::child(&folder_path, ".checkpoints")?;
 
     if checkpoints_dir.exists() {
         std::fs::remove_dir_all(&checkpoints_dir)
@@ -404,9 +409,13 @@ pub async fn cleanup_checkpoints(meeting_folder: String) -> Result<(), String> {
 /// Returns true if .checkpoints/ directory exists and contains .mp4 files
 #[tauri::command]
 pub async fn has_audio_checkpoints(meeting_folder: String) -> Result<bool, String> {
-    let folder_path = PathBuf::from(&meeting_folder);
-    if folder_path.join("audio.mp4").metadata().map(|meta| meta.is_file() && meta.len() > 0).unwrap_or(false) { return Ok(true); }
-    let checkpoints_dir = folder_path.join(".checkpoints");
+    let folder_path = crate::recording_paths::folder(std::path::Path::new(&meeting_folder))?;
+    has_audio_in_folder(&folder_path)
+}
+
+fn has_audio_in_folder(folder_path: &std::path::Path) -> Result<bool,String> {
+    if crate::recording_paths::child(&folder_path, "audio.mp4")?.metadata().map(|meta| meta.is_file() && meta.len() > 0).unwrap_or(false) { return Ok(true); }
+    let checkpoints_dir = crate::recording_paths::child(&folder_path, ".checkpoints")?;
 
     // Check if checkpoints directory exists
     if !checkpoints_dir.exists() {
@@ -434,12 +443,12 @@ mod tests {
     async fn finalized_audio_can_be_recovered_without_transcripts_or_checkpoints() {
         let dir = tempdir().unwrap();
         let folder = dir.path().to_string_lossy().into_owned();
-        assert!(!has_audio_checkpoints(folder.clone()).await.unwrap());
+        assert!(!has_audio_in_folder(dir.path()).unwrap());
         std::fs::write(dir.path().join("audio.mp4"), []).unwrap();
-        assert!(!has_audio_checkpoints(folder.clone()).await.unwrap());
+        assert!(!has_audio_in_folder(dir.path()).unwrap());
         std::fs::write(dir.path().join("audio.mp4"), b"already finalized audio").unwrap();
-        assert!(has_audio_checkpoints(folder.clone()).await.unwrap());
-        let recovered = recover_audio_from_checkpoints(folder, 48000).await.unwrap();
+        assert!(has_audio_in_folder(dir.path()).unwrap());
+        let recovered = recover_audio_in_folder(dir.path().to_path_buf()).await.unwrap();
         assert_eq!(recovered.status, "success");
         assert_eq!(recovered.audio_file_path.unwrap(), dir.path().join("audio.mp4").to_string_lossy());
     }

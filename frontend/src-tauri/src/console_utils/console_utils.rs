@@ -44,7 +44,7 @@ pub fn show_console() -> Result<String, String> {
     {
         // On macOS, we'll open Terminal.app with our app's logs
         // First, get the app name from the bundle
-        match Command::new("osascript")
+        match Command::new("/usr/bin/osascript")
             .arg("-e")
             .arg(r#"
                 tell application "Terminal"
@@ -81,7 +81,7 @@ pub fn hide_console() -> Result<String, String> {
     #[cfg(target_os = "macos")]
     {
         // On macOS, we'll close the Terminal window that's showing our logs
-        match Command::new("osascript")
+        match Command::new("/usr/bin/osascript")
             .arg("-e")
             .arg(r#"
                 tell application "Terminal"
@@ -123,7 +123,7 @@ pub fn toggle_console() -> Result<String, String> {
     #[cfg(target_os = "macos")]
     {
         // On macOS, check if Terminal is running with our log stream
-        let check_result = Command::new("osascript")
+        let check_result = Command::new("/usr/bin/osascript")
             .arg("-e")
             .arg(r#"
                 tell application "Terminal"

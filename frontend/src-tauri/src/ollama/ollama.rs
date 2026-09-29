@@ -3,7 +3,6 @@ use std::sync::Arc;
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use tauri::{command, AppHandle, Emitter, Runtime};
-use reqwest::Client;
 use tokio::time::{timeout, Duration, sleep};
 use tokio::sync::RwLock;
 use futures_util::StreamExt;
@@ -67,30 +66,15 @@ struct OllamaApiModel {
 
 // Helper function to check if endpoint is localhost
 fn is_localhost_endpoint(endpoint: Option<&str>) -> bool {
-    match endpoint {
-        None | Some("") => true,
-        Some(url) => {
-            url.contains("localhost") ||
-            url.contains("127.0.0.1") ||
-            url.contains("::1")
-        }
-    }
+    let value=endpoint.filter(|v|!v.trim().is_empty()).unwrap_or("http://localhost:11434");
+    let Ok(url)=url::Url::parse(value) else { return false; };
+    matches!(url.host_str(),Some("localhost"|"127.0.0.1"|"[::1]")) && url.scheme()=="http" && url.port()==Some(11434) && url.path()=="/"
 }
 
 // Helper function to validate endpoint URL format
 fn validate_endpoint_url(url: &str) -> Result<(), OllamaError> {
-    if url.is_empty() {
-        return Ok(()); // Empty is valid (uses default)
-    }
-
-    // Check if URL starts with http:// or https://
-    if !url.starts_with("http://") && !url.starts_with("https://") {
-        return Err(OllamaError::InvalidEndpoint(
-            "URL must start with http:// or https://".to_string()
-        ));
-    }
-
-    Ok(())
+    crate::network_security::endpoint(if url.trim().is_empty() { "http://localhost:11434" } else { url })
+        .map(|_| ()).map_err(OllamaError::InvalidEndpoint)
 }
 
 #[command]
@@ -159,8 +143,8 @@ async fn get_models_via_http_with_retry(endpoint: Option<&str>) -> Result<Vec<Ol
 }
 
 async fn get_models_via_http_async(endpoint: Option<&str>) -> Result<Vec<OllamaModel>, String> {
-    let client = Client::new();
-    let base_url = endpoint.unwrap_or("http://localhost:11434");
+    let client = crate::network_security::client()?;
+    let base_url = crate::network_security::endpoint(endpoint.filter(|s| !s.trim().is_empty()).unwrap_or("http://localhost:11434"))?;
     let url = format!("{}/api/tags", base_url);
 
     let response = client
@@ -262,6 +246,8 @@ pub async fn pull_ollama_model<R: Runtime>(
     model_name: String,
     endpoint: Option<String>,
 ) -> Result<(), String> {
+    let client = crate::network_security::client()?;
+    let base_url = crate::network_security::endpoint(endpoint.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("http://localhost:11434"))?;
     // Check if model is already being downloaded
     {
         let downloading = DOWNLOADING_MODELS.read().await;
@@ -278,8 +264,6 @@ pub async fn pull_ollama_model<R: Runtime>(
         log::info!("Started download tracking for model: {}", model_name);
     }
 
-    let client = Client::new();
-    let base_url = endpoint.as_deref().unwrap_or("http://localhost:11434");
     let url = format!("{}/api/pull", base_url);
 
     let payload = serde_json::json!({
@@ -437,8 +421,8 @@ pub async fn delete_ollama_model(
     model_name: String,
     endpoint: Option<String>,
 ) -> Result<(), String> {
-    let client = Client::new();
-    let base_url = endpoint.as_deref().unwrap_or("http://localhost:11434");
+    let client = crate::network_security::client()?;
+    let base_url = crate::network_security::endpoint(endpoint.as_deref().filter(|s| !s.trim().is_empty()).unwrap_or("http://localhost:11434"))?;
     let url = format!("{}/api/delete", base_url);
 
     let payload = serde_json::json!({
@@ -510,5 +494,19 @@ pub async fn get_ollama_model_context(
             // Return default instead of error for better UX
             Ok(4000)
         }
+    }
+}
+
+#[cfg(test)] mod security_tests {
+    use super::*;
+    #[test] fn remote_addresses_cannot_trigger_local_cli_fallback() {
+        assert!(!is_localhost_endpoint(Some("https://localhost.evil.example")));
+        assert!(!is_localhost_endpoint(Some("https://example.test/127.0.0.1")));
+        assert!(is_localhost_endpoint(None));
+        assert!(validate_endpoint_url("http://remote.example").is_err());
+        assert!(validate_endpoint_url("https://user:secret@example.test").is_err());
+    }
+    #[tokio::test] async fn invalid_endpoint_is_rejected_before_listing_models() {
+        assert!(get_ollama_models(Some("http://remote.example".into())).await.unwrap_err().contains("HTTPS"));
     }
 }

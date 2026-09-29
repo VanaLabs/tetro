@@ -192,12 +192,15 @@ async fn run_retranscription<R: Runtime>(
     model: Option<String>,
     provider: Option<String>,
 ) -> Result<RetranscriptionResult> {
-    let folder_path = PathBuf::from(&meeting_folder_path);
+    let folder_path = crate::recording_paths::folder(std::path::Path::new(&meeting_folder_path)).map_err(anyhow::Error::msg)?;
+    crate::recording_paths::child(&folder_path,"transcripts.json").map_err(anyhow::Error::msg)?;
+    crate::recording_paths::child(&folder_path,"metadata.json").map_err(anyhow::Error::msg)?;
     if let Some(state)=app.try_state::<AppState>() {
         let unavailable:bool=sqlx::query_scalar("SELECT deleted_at IS NOT NULL OR audio_trashed=1 FROM meetings WHERE id=?").bind(&meeting_id).fetch_one(state.db_manager.pool()).await?;
         if unavailable { return Err(anyhow!("This recording is in Trash. Restore its audio before transcribing it.")); }
     }
     let audio_path = find_audio_file(&folder_path)?;
+    crate::recording_paths::child(&folder_path,audio_path.file_name().and_then(|v|v.to_str()).ok_or_else(||anyhow!("Invalid audio file"))?).map_err(anyhow::Error::msg)?;
 
     // Determine which provider to use (default to whisper)
     let use_parakeet = provider.as_deref() == Some("parakeet");

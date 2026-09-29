@@ -40,7 +40,9 @@ pub async fn api_meeting_audio_path<R: Runtime>(
         .map_err(|e| e.to_string())?
         .flatten();
     let Some(folder) = folder else { return Ok(None) };
-    let Some(audio) = find_audio_file(Path::new(&folder)) else { return Ok(None) };
+    let folder = crate::recording_paths::folder(Path::new(&folder))?;
+    let Some(audio) = find_audio_file(&folder) else { return Ok(None) };
+    crate::recording_paths::child(&folder, audio.file_name().and_then(|n|n.to_str()).ok_or("Invalid audio file")?)?;
     app.asset_protocol_scope()
         .allow_file(&audio)
         .map_err(|e| format!("Could not open the recording for playback: {}", e))?;

@@ -27,8 +27,8 @@ export default function TetroSidebar() {
   const [searchFocused, setSearchFocused] = useState(false);
   const blurTimer = useRef<number>();
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  useEffect(() => { try { setRecentSearches(JSON.parse(localStorage.getItem('tetro.recentSearches') ?? '[]')); } catch { /* none */ } }, []);
-  const saveRecent = (list: string[]) => { setRecentSearches(list); try { localStorage.setItem('tetro.recentSearches', JSON.stringify(list)); } catch { /* session only */ } };
+  useEffect(() => { try { localStorage.removeItem('tetro.recentSearches'); } catch { /* Storage unavailable. */ } }, []);
+  const saveRecent = (list: string[]) => { setRecentSearches(list); };
   const rememberSearch = (q: string) => {
     const t = q.trim();
     if (t.length < 2) return;

@@ -265,7 +265,7 @@ pub async fn sync_transcript_file(pool: &SqlitePool, meeting: &str) -> Result<()
     if let Some(folder) = folder {
         let rows = sqlx::query("SELECT id,transcript,timestamp,audio_start_time,audio_end_time,duration FROM transcripts WHERE meeting_id=? ORDER BY audio_start_time,rowid").bind(meeting).fetch_all(pool).await.map_err(|e|e.to_string())?;
         let segments = rows.iter().map(|r| TranscriptSegment { id:r.get("id"),text:r.get("transcript"),timestamp:r.get("timestamp"),audio_start_time:r.get("audio_start_time"),audio_end_time:r.get("audio_end_time"),duration:r.get("duration") }).collect::<Vec<_>>();
-        crate::audio::common::write_transcripts_json(std::path::Path::new(&folder), &segments).map_err(|e|e.to_string())?;
+        crate::audio::common::write_transcripts_json(&{ let path = crate::recording_paths::folder(std::path::Path::new(&folder))?; crate::recording_paths::child(&path, "transcripts.json")?; path }, &segments).map_err(|e|e.to_string())?;
     }
     Ok(())
 }

@@ -246,6 +246,8 @@ pub async fn set_recording_preferences<R: Runtime>(
     app: AppHandle<R>,
     preferences: RecordingPreferences,
 ) -> Result<(), String> {
+    let current = load_recording_preferences(&app).await.map_err(|e| e.to_string())?;
+    if preferences.save_folder != current.save_folder { return Err("Choose recording locations through the native folder picker.".into()); }
     save_recording_preferences(&app, &preferences)
         .await
         .map_err(|e| format!("Failed to save recording preferences: {}", e))
@@ -279,7 +281,7 @@ pub async fn open_recordings_folder<R: Runtime>(app: AppHandle<R>) -> Result<(),
 
     #[cfg(target_os = "macos")]
     {
-        std::process::Command::new("open")
+        std::process::Command::new("/usr/bin/open")
             .arg(&folder_path)
             .spawn()
             .map_err(|e| format!("Failed to open folder: {}", e))?;

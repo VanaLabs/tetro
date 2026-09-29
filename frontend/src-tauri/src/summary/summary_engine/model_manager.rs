@@ -767,6 +767,7 @@ impl ModelManager {
 
     /// Validate that a file is a valid GGUF model
     async fn validate_gguf_file(&self, path: &PathBuf) -> Result<()> {
+        crate::model_integrity::summary(path)?;
         let mut file = fs::File::open(path).await?;
 
         // Read first 4 bytes to check for GGUF magic number

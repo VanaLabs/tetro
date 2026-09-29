@@ -32,7 +32,7 @@ pub fn open_tetro_folder(kind: String) -> Result<(), String> {
     }
     std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
-    let result = std::process::Command::new("open").arg(&directory).spawn();
+    let result = std::process::Command::new("/usr/bin/open").arg(&directory).spawn();
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("explorer").arg(&directory).spawn();
     #[cfg(target_os = "linux")]

@@ -1,6 +1,6 @@
 [package]
 name = "tetro"
-version = "9.1.1"
+version = "9.1.2"
 description = "Tetro desktop meeting recorder, transcription and notes"
 authors = ["Sujith S", "Vana Labs"]
 license = "MIT"
@@ -53,6 +53,7 @@ openblas = ["whisper-rs/openblas"] # Optimized BLAS (Auto-enabled on Windows/Lin
 openmp = ["whisper-rs/openmp"]     # OpenMP parallel processing
 
 [build-dependencies]
+tempfile = "3.3.0"
 tauri-build = { version = "2.3.0", features = [] }
 reqwest = { version = "0.12", features = ["blocking", "multipart", "json", "stream"] }
 which = "6.0.1"
@@ -143,13 +144,11 @@ ringbuf = "0.5.2"
 tempfile = "3.3.0"
 whatlang = "0.16.4"
 
-ffmpeg-sidecar = { git = "https://github.com/nathanbabcock/ffmpeg-sidecar", branch = "main" }
 
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "chrono", "macros", "migrate"] }
 
 # Common Tauri configuration
 tauri = { version = "2.6.2", features = [ "macos-private-api", "protocol-asset", "tray-icon"] }
-tauri-plugin-fs = "2.4.0"
 tauri-plugin-dialog = "2.3.0"
 tauri-plugin-store = "2.4.0"
 tauri-plugin-notification = "2.3.1"

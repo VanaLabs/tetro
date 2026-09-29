@@ -104,7 +104,7 @@ fn import_into(models_dir: &Path, source: &Path) -> Result<String, String> {
         }
         return Err(format!("A model called “{name}” is already added. Remove it first, or rename the file."));
     }
-    if std::fs::hard_link(source, &target).is_err() {
+    {
         std::fs::copy(source, &target).map_err(|e| {
             let _ = std::fs::remove_file(&target);
             format!("Couldn't copy the model: {e}")

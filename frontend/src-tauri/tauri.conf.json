@@ -1,7 +1,7 @@
 {
     "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
     "productName": "Tetro",
-    "version": "9.1.1",
+    "version": "9.1.2",
     "identifier": "am.vanalabs.tetro",
     "build": {
         "frontendDist": "../out",
@@ -31,7 +31,7 @@
                 "style-src": "'self' 'unsafe-inline'",
                 "img-src": "'self' asset: https://asset.localhost data:",
                 "media-src": "'self' asset: http://asset.localhost https://asset.localhost",
-                "connect-src": "'self' http://localhost:11434 http://localhost:5167 http://localhost:8178 https://api.ollama.ai"
+                "connect-src": "'self'"
             },
             "assetProtocol": {
                 "enable": true,
@@ -53,8 +53,6 @@
                         "core:menu:default",
                         "core:tray:default",
                         "core:window:allow-set-title",
-                        "dialog:allow-save",
-                        "store:default",
                         "notification:default",
                         "notification:allow-is-permission-granted",
                         "process:default",
@@ -94,7 +92,7 @@
             "hardenedRuntime": true
         },
         "windows": {
-            "signCommand": "powershell -ExecutionPolicy Bypass -File scripts/sign-windows.ps1 -FilePath %1"
+            "signCommand": "powershell -File scripts/sign-windows.ps1 -FilePath %1"
         }
     },
     "plugins": {

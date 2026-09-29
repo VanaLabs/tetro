@@ -103,27 +103,70 @@ pub async fn api_delete_trash_permanently<R:Runtime>(app:AppHandle<R>,state:taur
     let row=sqlx::query("SELECT t.*,m.folder_path FROM meeting_trash t JOIN meetings m ON m.id=t.meeting_id WHERE t.id=?").bind(&id).fetch_one(pool).await.map_err(|e|e.to_string())?;
     let meeting:String=row.get("meeting_id");
     let parts:Parts=serde_json::from_str(row.get("parts")).map_err(|e|e.to_string())?;
-    if parts.audio {
-        if let Some(folder)=row.get::<Option<String>,_>("folder_path") {
-            let folder=std::path::Path::new(&folder);
-            // Only Tetro's named recording files; never remove an arbitrary
-            // user-selected folder recursively or follow symlinks into it.
-            if folder.symlink_metadata().is_ok_and(|m|m.file_type().is_symlink()) { return Err("This recording folder is a link. Remove its audio manually from the original folder.".into()); }
-            while let Some(path)=crate::meeting_media::find_audio_file(folder) {
-                if path.symlink_metadata().is_ok_and(|m|m.file_type().is_symlink()) { return Err("This audio is a link. Remove it manually from the recording folder.".into()); }
-                std::fs::remove_file(path).map_err(|e|format!("Could not remove the audio: {}",e))?;
+    let folder = row.get::<Option<String>,_>("folder_path");
+    if let Some(folder) = folder.as_deref().filter(|p| std::path::Path::new(p).exists()) {
+        let folder=crate::recording_paths::folder(std::path::Path::new(folder))?;
+        if parts.audio {
+            while let Some(path)=crate::meeting_media::find_audio_file(&folder) {
+                crate::recording_paths::child(&folder,path.file_name().and_then(|n|n.to_str()).ok_or("Invalid audio file")?)?;
+                std::fs::remove_file(path).map_err(|e|e.to_string())?;
             }
-            if parts.whole() { for file in ["transcripts.json","metadata.json"] { let path=folder.join(file); if path.exists() { std::fs::remove_file(path).map_err(|e|e.to_string())?; } } }
+            let checkpoints=crate::recording_paths::child(&folder,".checkpoints")?;
+            if checkpoints.exists() { std::fs::remove_dir_all(checkpoints).map_err(|e|e.to_string())?; }
         }
+        if parts.transcript { let path=crate::recording_paths::child(&folder,"transcripts.json")?; if path.exists() {std::fs::remove_file(path).map_err(|e|e.to_string())?;} }
+        if parts.whole() { let path=crate::recording_paths::child(&folder,"metadata.json")?; if path.exists() {std::fs::remove_file(path).map_err(|e|e.to_string())?;} }
     }
-    if parts.whole() { crate::database::repositories::meeting::MeetingsRepository::delete_meeting(pool,&meeting).await.map_err(|e|e.to_string())?; }
-    else {
-        let mut tx=pool.begin().await.map_err(|e|e.to_string())?;
-        sqlx::query("DELETE FROM meeting_trash WHERE id=?").bind(id).execute(&mut *tx).await.map_err(|e|e.to_string())?;
-        if let Some(version)=row.get::<Option<String>,_>("version_id") { sqlx::query("DELETE FROM meeting_versions WHERE id=?").bind(version).execute(&mut *tx).await.map_err(|e|e.to_string())?; }
-        tx.commit().await.map_err(|e|e.to_string())?;
-    }
+    purge_deleted_content(pool,&id,&meeting,&parts).await?;
+    use tauri::Emitter;
+    let _=app.emit("tetro-local-cleanup",());
     crate::meeting_preferences::changed(&app,&meeting); Ok(())
+}
+
+async fn purge_deleted_content(pool:&SqlitePool,id:&str,meeting:&str,parts:&Parts)->Result<(),String> {
+    let mut tx=pool.begin().await.map_err(|e|e.to_string())?;
+    let mut ids:Vec<String>=sqlx::query_scalar("SELECT id FROM transcripts WHERE meeting_id=?").bind(meeting).fetch_all(&mut *tx).await.map_err(|e|e.to_string())?;
+    let versions:Vec<(String,String)>=sqlx::query_as("SELECT id,payload FROM meeting_versions WHERE meeting_id=?").bind(meeting).fetch_all(&mut *tx).await.map_err(|e|e.to_string())?;
+    for (version,payload) in versions {
+        let mut value:serde_json::Value=serde_json::from_str(&payload).map_err(|e|e.to_string())?;
+        if let Some(lines)=value["transcripts"].as_array() { ids.extend(lines.iter().filter_map(|line|line["id"].as_str().map(str::to_owned))); }
+        if parts.transcript { value["transcripts"]=serde_json::json!([]); }
+        if parts.summary {
+            value["summary"]=serde_json::Value::Null;
+            if let Some(lines)=value["transcripts"].as_array_mut() {
+                for line in lines { for field in ["summary", "action_items", "key_points"] { line[field]=serde_json::Value::Null; } }
+            }
+        }
+        if let Some(edits)=value["edits"].as_array_mut() { edits.retain(|e| !(parts.transcript && e["kind"]=="transcript" || parts.summary && e["kind"]=="summary")); }
+        sqlx::query("UPDATE meeting_versions SET payload=? WHERE id=?").bind(value.to_string()).bind(version).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+    }
+    ids.sort();ids.dedup();
+    sqlx::query("INSERT INTO local_deletion_cleanup(id,meeting_id,transcript_ids,parts) VALUES(?,?,?,?)").bind(uuid::Uuid::new_v4().to_string()).bind(meeting).bind(serde_json::to_string(&ids).unwrap()).bind(serde_json::to_string(parts).unwrap()).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+    if parts.whole() {
+        sqlx::query("DELETE FROM meetings WHERE id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+    } else {
+        if parts.transcript {
+            sqlx::query("DELETE FROM transcript_chunks WHERE meeting_id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+        }
+        if parts.summary {
+            sqlx::query("UPDATE transcripts SET summary=NULL,action_items=NULL,key_points=NULL WHERE meeting_id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+            sqlx::query("UPDATE meeting_trash SET tasks='[]' WHERE meeting_id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+        }
+        sqlx::query("DELETE FROM meeting_trash WHERE id=?").bind(id).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+    }
+    tx.commit().await.map_err(|e|e.to_string())?;
+    Ok(())
+}
+
+#[derive(Serialize,sqlx::FromRow)]
+pub struct CleanupReceipt { id:String, meeting_id:String, transcript_ids:String, parts:String }
+#[tauri::command]
+pub async fn api_pending_local_cleanup(state:tauri::State<'_,AppState>)->Result<Vec<CleanupReceipt>,String> {
+    sqlx::query_as("SELECT * FROM local_deletion_cleanup").fetch_all(state.db_manager.pool()).await.map_err(|e|e.to_string())
+}
+#[tauri::command]
+pub async fn api_ack_local_cleanup(state:tauri::State<'_,AppState>,id:String)->Result<(),String> {
+    sqlx::query("DELETE FROM local_deletion_cleanup WHERE id=?").bind(id).execute(state.db_manager.pool()).await.map_err(|e|e.to_string())?;Ok(())
 }
 
 #[cfg(test)]
@@ -138,7 +181,19 @@ mod tests {
         sqlx::query("INSERT INTO summary_processes(meeting_id,status,created_at,updated_at,result) VALUES('m','completed','','','{\"markdown\":\"Our notes\"}')").execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO meeting_action_items(id,meeting_id,canonical_text,text,done,created_at,updated_at) VALUES('task','m','Send budget','Send budget',1,'','')").execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO meeting_marks VALUES('mark','m',2.5,'')").execute(&pool).await.unwrap();
+        sqlx::raw_sql(include_str!("../migrations/20260929180000_local_deletion_cleanup.sql")).execute(&pool).await.unwrap();
         pool
+    }
+    #[tokio::test]
+    async fn permanent_summary_deletion_redacts_old_versions_but_preserves_transcripts() {
+        let pool=pool().await;
+        sqlx::query("UPDATE transcripts SET summary='Old embedded summary'").execute(&pool).await.unwrap();
+        meeting_edits::save_version(&pool,"m","summary","Older notes").await.unwrap();
+        let id=move_to_trash(&pool,"m",Parts{summary:true,..Parts::default()}).await.unwrap();
+        purge_deleted_content(&pool,&id,"m",&Parts{summary:true,..Parts::default()}).await.unwrap();
+        let payloads:Vec<String>=sqlx::query_scalar("SELECT payload FROM meeting_versions").fetch_all(&pool).await.unwrap();
+        assert!(payloads.iter().all(|v|!v.contains("Our notes") && !v.contains("Old embedded summary") && v.contains("Our corrected transcript")));
+        assert_eq!(sqlx::query_scalar::<_,i64>("SELECT count(*) FROM local_deletion_cleanup").fetch_one(&pool).await.unwrap(),1);
     }
     #[tokio::test]
     async fn full_meeting_returns_with_its_content_and_completed_tasks() {

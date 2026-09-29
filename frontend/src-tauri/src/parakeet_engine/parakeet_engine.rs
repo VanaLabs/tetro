@@ -456,6 +456,9 @@ impl ParakeetEngine {
     fn validate_model_directory(model_dir: &Path, artifacts: &[ArtifactSpec]) -> Result<()> {
         for artifact in artifacts {
             let path = model_dir.join(artifact.filename);
+            if let Some(spec) = PARAKEET_MODEL_SPECS.iter().find(|spec| std::ptr::eq(spec.artifacts, artifacts)) {
+                crate::model_integrity::verify(&path, &format!("{}/{}",spec.name,artifact.filename))?;
+            }
             let metadata = std::fs::metadata(&path)
                 .map_err(|error| anyhow!("Failed to read {} metadata: {}", artifact.filename, error))?;
             if metadata.len() != artifact.exact_bytes {
@@ -504,6 +507,7 @@ impl ParakeetEngine {
 
                 let quantized = model_info.quantization == QuantizationType::Int8;
                 let model_path = model_info.path.clone();
+                let spec = find_model_spec(model_name);
                 #[cfg(test)]
                 let model_lifecycle_test_hook = self.load_test_hook().await;
                 #[cfg(test)]
@@ -514,6 +518,8 @@ impl ParakeetEngine {
                         hook.load_started.notify_one();
                         runtime_handle.block_on(hook.continue_load.notified());
                     }
+                    let spec = spec.ok_or_else(||"Unknown model".to_string())?;
+                    Self::validate_model_directory(&model_path, spec.artifacts).map_err(|e|e.to_string())?;
                     ParakeetModel::new(&model_path, quantized)
                         .map_err(|error| error.to_string())
                 })
