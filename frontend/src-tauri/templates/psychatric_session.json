@@ -1,64 +1,36 @@
- {
-      "name": "Psychiatric Session Note (SOAP + AI Hybrid)",
-      "description": "AI-assisted psychiatric progress note template based on SOAP, with clinical metadata and AI summary.",
-      "sections": [
-        {
-          "title": "Session Metadata",
-          "instruction": "Patient initials/ID, session date, provider, session type, duration (HIPAA-sensitive)",
-          "format": "string"
-        },
-        {
-          "title": "AI Session Summary",
-          "instruction": "One-line takeaway and one-paragraph executive summary (AI-generated). Include confidence score.",
-          "format": "paragraph"
-        },
-        {
-          "title": "Subjective (S)",
-          "instruction": "Patient's self-reported mood, symptoms, sleep, appetite, stressors",
-          "format": "paragraph"
-        },
-        {
-          "title": "Objective (O)",
-          "instruction": "Observable findings: affect, speech, behavior, orientation, vitals if relevant",
-          "format": "paragraph"
-        },
-        {
-          "title": "Assessment (A)",
-          "instruction": "Diagnostic impression, risk assessment (SI/HI), progress vs treatment goals",
-          "format": "paragraph"
-        },
-        {
-          "title": "Plan (P)",
-          "instruction": "Interventions, medication changes, referrals, therapy tasks and follow-up",
-          "format": "list",
-          "item_format": "| **Intervention** | **Owner** | **Frequency** | **Follow-up Date** |\n| --- | --- | --- | --- |"
-        },
-        {
-          "title": "Medications",
-          "instruction": "Current medications, doses, changes, and rationale",
-          "format": "list",
-          "item_format": "| **Medication** | **Dose** | **Route** | **Start/Change Date** |\n| --- | --- | --- | --- |"
-        },
-        {
-          "title": "Diagnoses (DSM/ICD)",
-          "instruction": "List diagnostic codes and working diagnosis",
-          "format": "list",
-          "item_format": "| **Code** | **System** | **Diagnosis** |\n| --- | --- | --- |"
-        },
-        {
-          "title": "Safety & Risk Management",
-          "instruction": "Safety plan, emergency contacts, hospitalization considerations",
-          "format": "paragraph"
-        },
-        {
-          "title": "Next Appointment",
-          "instruction": "Date, time and modality of next session",
-          "format": "string"
-        },
-        {
-          "title": "Audit Trail",
-          "instruction": "Human review flag, reviewer name and timestamp, AI version",
-          "format": "paragraph"
-        }
-      ]
+{
+  "name": "Therapy Visit",
+  "description": "A personal recap of a visit with a psychologist, therapist, or counselor.",
+  "sections": [
+    {
+      "title": "Visit Overview",
+      "instruction": "Summarize why the visit happened and what the person and clinician discussed, as far as the recording states. Write as a personal recap rather than a clinician's record.",
+      "format": "paragraph"
+    },
+    {
+      "title": "What I Shared",
+      "instruction": "Capture experiences, feelings, concerns, changes, or questions the person explicitly described. Do not infer symptoms or add a diagnosis.",
+      "format": "list"
+    },
+    {
+      "title": "What We Discussed",
+      "instruction": "Summarize the clinician's responses, explanations, suggestions, and any discussion of diagnoses, medication, or other care when those topics actually came up. Attribute statements clearly and do not turn a discussion into a new clinical recommendation.",
+      "format": "list"
+    },
+    {
+      "title": "What Stood Out",
+      "instruction": "Capture takeaways or reflections the person expressed about the visit. If interpreting what mattered, make that interpretation clear and ground it in the conversation.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Questions for Next Visit",
+      "instruction": "List questions the person raised or wanted to revisit later. Omit this section when none were stated.",
+      "format": "list"
+    },
+    {
+      "title": "Next Steps",
+      "instruction": "Include only follow-up actions, exercises, appointments, or care changes explicitly discussed or chosen during the visit. Preserve who proposed each step and any timing when stated; omit this section when none were discussed.",
+      "format": "list"
     }
+  ]
+}

@@ -1,7 +1,7 @@
 import { resolveTranscriptionRoute } from './transcription-language-routing';
 export function modelUseNote(provider: string, model: string, selected: boolean): string {
   if (selected && provider === 'parakeet' && model === 'stt-fastconformer-armenian') return 'Currently used for Armenian transcription.';
-  if (provider === 'builtin-ai') return selected ? 'Currently used for notes.' : '';
+  if (provider === 'builtin-ai') return selected ? 'Currently used for summaries.' : '';
   const languages = [['en', 'English'], ['ru', 'Russian'], ['hy', 'Armenian']].filter(([code]) => {
     const route = resolveTranscriptionRoute(code);
     return route.kind === 'switch' && route.provider === provider && route.model === model;

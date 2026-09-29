@@ -2,10 +2,11 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { RECOMMENDED_SUMMARY_MODEL } from '@/lib/recommended-models';
 import type { PermissionStatus, OnboardingPermissions } from '@/types/onboarding';
 
 export const STARTER_TRANSCRIPTION_MODEL = 'tiny';
-export const STARTER_SUMMARY_MODEL = 'gemma3:1b';
+export const STARTER_SUMMARY_MODEL = RECOMMENDED_SUMMARY_MODEL;
 
 interface OnboardingStatus {
   version: string;
@@ -77,7 +78,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           invoke<boolean>('builtin_ai_is_model_ready', { modelName: model, refresh: true }).catch(() => false),
         ]);
         if (!active) return;
-        setCurrentStep(Math.min(Math.max(saved?.current_step || 1, 1), 4));
+        // In v1.2, the old overview and download pages became one model page.
+        const savedStep = saved?.current_step || 1;
+        const step = saved && !saved.completed && saved.version !== '1.2'
+          ? (savedStep >= 4 ? 3 : savedStep >= 2 ? 2 : 1)
+          : savedStep;
+        setCurrentStep(Math.min(Math.max(step, 1), 3));
         setCompleted(Boolean(saved?.completed));
         setLegacyParakeetStatus(saved?.model_status.parakeet || 'not_downloaded');
         setSelectedSummaryModel(model);
@@ -98,7 +104,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     const timer = setTimeout(() => {
       if (completingRef.current) return;
       const status: OnboardingStatus = {
-        version: '1.1',
+        version: '1.2',
         completed: false,
         current_step: currentStep,
         model_status: {
@@ -138,9 +144,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [selectedSummaryModel]);
 
   const goToStep = useCallback((step: number) => {
-    setCurrentStep(Math.max(1, Math.min(step, 4)));
+    setCurrentStep(Math.max(1, Math.min(step, 3)));
   }, []);
-  const goNext = useCallback(() => setCurrentStep((step) => Math.min(step + 1, 4)), []);
+  const goNext = useCallback(() => setCurrentStep((step) => Math.min(step + 1, 3)), []);
   const goPrevious = useCallback(() => setCurrentStep((step) => Math.max(step - 1, 1)), []);
   const setPermissionStatus = useCallback((permission: keyof OnboardingPermissions, status: PermissionStatus) => {
     setPermissions((previous) => ({ ...previous, [permission]: status }));

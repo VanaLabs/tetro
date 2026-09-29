@@ -23,7 +23,7 @@ export function showUpdateNotification(updateInfo: UpdateInfo, onUpdateClick?: (
       <div className="flex items-center gap-2">
         <Download className="h-4 w-4" />
         <div>
-          <p className="font-medium">Update Available</p>
+          <p className="font-medium">Update available</p>
           <p className="text-sm text-muted-foreground">
             Version {updateInfo.version} is now available
           </p>

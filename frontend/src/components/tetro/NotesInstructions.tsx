@@ -26,7 +26,7 @@ export function NotesInstructions({ value, onChange, onApply, hasNotes, disabled
         <button className="tetro-primary" disabled={disabled || !draft.trim()} onClick={() => { onChange(draft); setOpen(false); onApply(draft); }}>{hasNotes ? 'Summarize again' : 'Summarize'}</button>
       </div>
   </>;
-  if (hideTrigger) return <Dialog open={open} onOpenChange={o => { setOpen(o); if (o) setDraft(value); }}><DialogContent className="tetro-instructions tetro-instructions-dialog" onCloseAutoFocus={event => { if (returnFocus) { event.preventDefault(); returnFocus(); } }}><DialogTitle>Notes instructions</DialogTitle><DialogDescription>Tell Tetro what to include or fix.</DialogDescription>{content}</DialogContent></Dialog>;
+  if (hideTrigger) return <Dialog open={open} onOpenChange={o => { setOpen(o); if (o) setDraft(value); }}><DialogContent className="tetro-instructions tetro-instructions-dialog" onCloseAutoFocus={event => { if (returnFocus) { event.preventDefault(); returnFocus(); } }}><DialogTitle>Summary instructions</DialogTitle><DialogDescription>Tell Tetro what to include or fix.</DialogDescription>{content}</DialogContent></Dialog>;
   return <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setDraft(value); }}>
     <PopoverTrigger asChild>
       <Button variant="outline" size="sm" aria-label="Instructions for the summary" title={set ? 'Instructions are set for this summary' : 'Tell Tetro what the summary should include'} className={set ? 'tetro-has-dot' : ''}>

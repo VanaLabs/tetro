@@ -9,6 +9,7 @@ export type ModelRowState =
   | { kind: 'missing' }
   | { kind: 'downloading'; progress: number }
   | { kind: 'cancelling' }
+  | { kind: 'paused'; downloadedMb: number }
   | { kind: 'error'; message?: string }
   | { kind: 'corrupted' };
 
@@ -54,6 +55,11 @@ export function ModelRow({ name, note, sizeMb, sizeLabel, speed, accuracy, extra
           {onCancel && <button type="button" className="tetro-model-remove" onClick={onCancel} title="Cancel download" aria-label={`Cancel downloading ${name}`}><X className="h-4 w-4" /></button>}
         </>}
         {state.kind === 'cancelling' && <span className="tetro-model-pct">Cancelling…</span>}
+        {state.kind === 'paused' && <>
+          <span className="tetro-model-saved" title="Paused download saved on this device">{Math.round(state.downloadedMb)} MB</span>
+          <button type="button" className="tetro-model-remove" onClick={onDelete} title={`Remove saved download for ${name}`} aria-label={`Remove ${name}`}><Trash2 className="h-4 w-4" /></button>
+          <button type="button" className="tetro-key" onClick={onDownload}>Resume</button>
+        </>}
         {state.kind === 'error' && <button type="button" className="tetro-key" onClick={onDownload} title={state.message}>Retry</button>}
         {state.kind === 'corrupted' && <>
           <button type="button" className="tetro-key" onClick={onDownload}>Download again</button>
@@ -70,6 +76,7 @@ export function rowStateFromStatus(status: unknown, cancelling: boolean): ModelR
   if (status === 'Available') return { kind: 'ready' };
   if (status && typeof status === 'object') {
     if ('Downloading' in status) return { kind: 'downloading', progress: (status as { Downloading: { progress: number } }).Downloading.progress };
+    if ('Paused' in status) return { kind: 'paused', downloadedMb: (status as { Paused: { downloaded_bytes: number } }).Paused.downloaded_bytes / (1024 * 1024) };
     if ('Error' in status) return { kind: 'error', message: String((status as { Error: string }).Error) };
     if ('Corrupted' in status) return { kind: 'corrupted' };
   }

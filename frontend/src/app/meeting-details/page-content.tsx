@@ -114,11 +114,12 @@ export default function PageContent({
 
       // Emit event so ConfigContext and other listeners stay in sync
       const { emit } = await import('@tauri-apps/api/event');
-      await emit('model-config-updated', config);
+      await emit('model-config-updated', { ...config, apiKey: null, customOpenAIApiKey: null });
 
     } catch (error) {
       console.error('Failed to save model config:', error);
       toast.error('Failed to save model settings');
+      throw error;
     }
   };
 
@@ -245,7 +246,7 @@ export default function PageContent({
               modelConfig={modelConfig}
               setModelConfig={setModelConfig}
               onSaveModelConfig={handleSaveModelConfig}
-              onGenerateSummary={async (prompt) => { try { await meetingData.blockNoteSummaryRef.current?.saveSummary(); await summaryGeneration.handleGenerateSummary(prompt); } catch (e) { toast.error('Save your edits before generating notes', { description: String(e) }); } }}
+              onGenerateSummary={async (prompt) => { try { await meetingData.blockNoteSummaryRef.current?.saveSummary(); await summaryGeneration.handleGenerateSummary(prompt); } catch (e) { toast.error('Save your edits before generating a summary', { description: String(e) }); } }}
               onStopGeneration={summaryGeneration.handleStopGeneration}
               customPrompt={customPrompt}
               onPromptChange={setCustomPrompt}

@@ -22,8 +22,8 @@ impl NotesModel {
     pub async fn load(pool: &SqlitePool) -> Result<Self, String> {
         let config = SettingsRepository::get_model_config(pool)
             .await
-            .map_err(|e| format!("Could not read the notes model settings: {}", e))?
-            .ok_or("Choose a notes model in Settings → Notes first.")?;
+            .map_err(|e| format!("Could not read the summary model settings: {}", e))?
+            .ok_or("Choose a summary model in Settings → Models first.")?;
         let provider = LLMProvider::from_str(&config.provider)?;
         let (api_key, custom_endpoint, max_tokens, temperature, top_p) = match provider {
             LLMProvider::Ollama | LLMProvider::BuiltInAI => (String::new(), None, None, None, None),
@@ -39,7 +39,7 @@ impl NotesModel {
                     .await
                     .map_err(|e| format!("Could not read the API key: {}", e))?
                     .filter(|k| !k.is_empty())
-                    .ok_or_else(|| format!("Add an API key for {} in Settings → Notes first.", config.provider))?;
+                    .ok_or_else(|| format!("Add an API key for {} in Settings → Models first.", config.provider))?;
                 (key, None, None, None, None)
             }
         };
@@ -66,7 +66,7 @@ impl NotesModel {
     }
 
     pub async fn complete_cancellable(&self, app_data_dir: Option<&PathBuf>, system: &str, user: &str, max_tokens: u32, cancellation: Option<&CancellationToken>) -> Result<String, String> {
-        let client = reqwest::Client::new();
+        let client = crate::network_security::client()?;
         generate_summary(
             &client, &self.provider, &self.model, &self.api_key, system, user,
             self.ollama_endpoint.as_deref(), self.custom_endpoint.as_deref(),

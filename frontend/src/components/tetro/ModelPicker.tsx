@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useRef, useId } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
+import { Check, ChevronsUpDown, Download, Loader2 } from 'lucide-react';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -50,7 +50,7 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
     try {
       if (choice.provider === 'localWhisper' || choice.provider === 'parakeet') await activateModel(choice.provider, choice.model);
       else {
-        const saved = await activateNotesModel({ ...choice.config, provider: choice.provider, model: choice.model }, (providerApiKeys as Record<string, string | null>)[choice.provider]);
+        const saved = await activateNotesModel({ ...choice.config, provider: choice.provider, model: choice.model });
         setModelConfig(saved); onSaved?.(saved);
       }
       setOpen(false);
@@ -64,6 +64,8 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
     else {
       sessionStorage.setItem('tetro.settingsTab', 'models');
       sessionStorage.setItem('tetro.modelsSection', purpose === 'transcription' ? 'transcription' : ['openai', 'claude', 'groq', 'openrouter', 'ollama', 'custom-openai'].includes(current.provider) ? 'external' : 'summary');
+      if (purpose === 'transcription') sessionStorage.setItem('tetro.browseTranscriptionModels', '1');
+      if (purpose === 'notes') sessionStorage.setItem('tetro.browseSummaryModels', '1');
       router.push('/settings');
     }
   };
@@ -71,7 +73,7 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
   const ordered = sources.map(s => states[s.id]).filter(Boolean);
   const loading = ordered.some(s => s.status === 'loading') || ordered.length < sources.length;
   const hasChoices = ordered.some(s => s.options.length);
-  const disconnected = purpose === 'notes' && ['openai', 'claude', 'groq', 'openrouter'].includes(current.provider) && !(providerApiKeys as Record<string, string | null>)[current.provider]?.trim();
+  const disconnected = purpose === 'notes' && ['openai', 'claude', 'groq', 'openrouter'].includes(current.provider) && !(providerApiKeys as Record<string, boolean>)[current.provider];
   const missing = open && current.model && ordered.find(s => s.source.id === current.provider)?.status === 'ready' && !ordered.some(s => s.options.some(o => o.provider === current.provider && o.model === current.model));
   const label = current.model ? modelLabel(current.provider, current.model) : 'Choose a model';
   const content = <div className="tetro-chooser">
@@ -79,7 +81,7 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
     <Command>
       <CommandInput placeholder="Search models…" aria-label={`Search ${title.toLowerCase()}s`} />
       <CommandList className="max-h-[310px]" aria-label={title}>
-        <CommandEmpty>{loading && !hasChoices ? 'Looking for installed models…' : 'No matching models. Get more models below.'}</CommandEmpty>
+        <CommandEmpty>{loading && !hasChoices ? 'Looking for installed models…' : 'No matching models. Download more models below.'}</CommandEmpty>
         {ordered.filter(s => s.options.length).map(s => <CommandGroup key={s.source.id} heading={s.source.label}>
           {s.options.map(o => {
             const selected = current.provider === o.provider && current.model === o.model;
@@ -100,7 +102,7 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
       {missing && !disconnected && <p>Your saved model isn’t available. Choose another or get more models below.</p>}
       {error && <p role="alert">{error}</p>}
     </div>
-    <button type="button" className="tetro-chooser-more" disabled={saving} onClick={getMore}>Get more models…</button>
+    <button type="button" className="tetro-key tetro-key-amber tetro-chooser-more" disabled={saving} onClick={getMore}><Download aria-hidden="true" className="h-4 w-4" />Download more models</button>
   </div>;
   if (presentation === 'dialog') return <Dialog open={open} onOpenChange={value => { if (!saving) setOpen(value); }}><DialogContent className="tetro-chooser-dialog" onCloseAutoFocus={event => { if (returnFocus) { event.preventDefault(); returnFocus(); } }}>
     <DialogTitle>{title}</DialogTitle><DialogDescription>Choose a model that’s ready to use.</DialogDescription>{content}

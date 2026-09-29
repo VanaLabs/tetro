@@ -37,7 +37,7 @@ export function usePlatform(): Platform {
   useEffect(() => {
     async function detectPlatform() {
       // Check if Tauri is available
-      if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__) {
+      if (typeof window === 'undefined' || !window.__TAURI_INTERNALS__ || !(window as unknown as { __TAURI_OS_PLUGIN_INTERNALS__?: unknown }).__TAURI_OS_PLUGIN_INTERNALS__) {
         // Not in Tauri environment, use user agent
         setCurrentPlatform(detectPlatformFromUserAgent());
         return;

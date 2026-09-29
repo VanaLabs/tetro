@@ -21,7 +21,8 @@ export async function saveSummaryModel(change: Partial<ModelConfig>, apiKey?: st
   const next = {
     provider: 'builtin-ai', model: '', whisperModel: 'large-v3', ollamaEndpoint: null,
     ...current, ...change,
-    apiKey: apiKey ?? (current?.provider === (change.provider ?? current?.provider) ? current?.apiKey : null) ?? null,
+    apiKey: null,
+    customOpenAIApiKey: null,
   } as ModelConfig;
   await invoke('api_save_model_config', {
     provider: next.provider, model: next.model, whisperModel: next.whisperModel || 'large-v3',

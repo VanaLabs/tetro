@@ -55,7 +55,7 @@ pub fn build_openai_compat_chat_body(
     temperature: Option<f32>,
     top_p: Option<f32>,
 ) -> serde_json::Value {
-    let (max_tokens_val, temperature_val, top_p_val) = if *provider == LLMProvider::CustomOpenAI {
+    let (max_tokens_val, temperature_val, top_p_val) = if matches!(provider, LLMProvider::CustomOpenAI | LLMProvider::Ollama) {
         (max_tokens, temperature, top_p)
     } else {
         (None, None, None)
@@ -289,6 +289,7 @@ pub(crate) async fn generate_summary(
             system_prompt,
             user_prompt,
             max_tokens,
+            temperature,
             cancellation_token,
         )
         .await
@@ -351,6 +352,8 @@ pub(crate) async fn generate_summary(
         }
     };
 
+    let api_url = crate::network_security::endpoint(&api_url)?;
+
     // Add authorization header for non-Claude providers
     if provider != &LLMProvider::Claude {
         headers.insert(
@@ -359,6 +362,9 @@ pub(crate) async fn generate_summary(
                 .parse()
                 .map_err(|_| "Invalid authorization header".to_string())?,
         );
+    }
+    for name in [header::AUTHORIZATION, header::HeaderName::from_static("x-api-key")] {
+        if let Some(value) = headers.get_mut(name) { value.set_sensitive(true); }
     }
     headers.insert(
         header::CONTENT_TYPE,
@@ -443,8 +449,8 @@ pub(crate) async fn generate_summary(
             .unwrap_or_else(|error| format!("Failed to read LLM error response body: {error}"));
         if provider != &LLMProvider::Ollama || !ollama_rejects_reasoning_effort(status, &error_body) {
             return Err(format!(
-                "LLM API request failed with status {}: {}",
-                status, error_body
+                "LLM API request failed with status {}. Check your provider settings and account.",
+                status
             ));
         }
 
@@ -476,12 +482,10 @@ pub(crate) async fn generate_summary(
 
     if !response.status().is_success() {
         let status = response.status();
-        let error_body = await_or_cancel(response.text(), cancellation_token)
-            .await?
-            .unwrap_or_else(|error| format!("Failed to read LLM error response body: {error}"));
+        let _ = await_or_cancel(response.text(), cancellation_token).await?;
         return Err(format!(
-            "LLM API request failed with status {}: {}",
-            status, error_body
+            "LLM API request failed with status {}. Check your provider settings and account.",
+            status
         ));
     }
 
@@ -925,4 +929,3 @@ fn provider_name(provider: &LLMProvider) -> &str {
         LLMProvider::CustomOpenAI => "Custom OpenAI",
     }
 }
-

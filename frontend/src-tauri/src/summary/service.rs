@@ -548,8 +548,9 @@ impl SummaryService {
             }),
         };
 
-        let client = reqwest::Client::new();
-        let result = generate_meeting_summary(
+        let result = async {
+        let client = crate::network_security::client()?;
+        generate_meeting_summary(
             &client,
             &provider,
             &model_name,
@@ -570,7 +571,8 @@ impl SummaryService {
             detected_summary_language.as_deref(),
             cached_english.as_deref(),
         )
-        .await;
+        .await
+        }.await;
 
         let duration = start_time.elapsed().as_secs_f64();
 
@@ -589,7 +591,7 @@ impl SummaryService {
                     "✓ Successfully processed {} chunks for meeting_id: {}. Duration: {:.2}s",
                     generated.successful_chunk_count, meeting_id, duration
                 );
-                let result_json = match build_summary_result_json(
+                let mut result_json = match build_summary_result_json(
                     &final_markdown,
                     &generated.english_markdown,
                     cache_source,
@@ -605,6 +607,9 @@ impl SummaryService {
                     }
                 };
 
+                if super::processor::is_brief_transcript(&text) {
+                    result_json["generation_kind"] = serde_json::json!("transcript_excerpt");
+                }
                 match SummaryProcessesRepository::update_process_completed(
                     &pool,
                     &meeting_id,
@@ -799,7 +804,7 @@ mod tests {
             &template_fingerprint,
             3700,
             "ollama",
-            "gemma3:1b",
+            "qwen3.5:2b",
             Some("http://localhost:11434"),
             None,
             None,
@@ -907,7 +912,7 @@ mod tests {
                 &template_fingerprint,
                 3700,
                 "ollama",
-                "gemma3:1b",
+                "qwen3.5:2b",
                 Some("http://localhost:11434"),
                 None,
                 None,
@@ -921,7 +926,7 @@ mod tests {
                 &template_fingerprint,
                 3700,
                 "ollama",
-                "gemma3:1b",
+                "qwen3.5:2b",
                 Some("http://localhost:11434"),
                 None,
                 None,
@@ -935,7 +940,7 @@ mod tests {
                 &template_fingerprint,
                 3700,
                 "ollama",
-                "gemma3:1b",
+                "qwen3.5:2b",
                 Some("http://localhost:11434"),
                 None,
                 None,
@@ -949,7 +954,7 @@ mod tests {
                 &template_fingerprint,
                 3700,
                 "openai",
-                "gemma3:1b",
+                "qwen3.5:2b",
                 Some("http://localhost:11434"),
                 None,
                 None,
@@ -977,7 +982,7 @@ mod tests {
                 &template_fingerprint,
                 3700,
                 "ollama",
-                "gemma3:1b",
+                "qwen3.5:2b",
                 Some("http://localhost:11500"),
                 None,
                 None,
@@ -991,7 +996,7 @@ mod tests {
                 &template_fingerprint,
                 3700,
                 "ollama",
-                "gemma3:1b",
+                "qwen3.5:2b",
                 Some("http://localhost:11434"),
                 Some("https://custom.example/v1"),
                 Some(2048),

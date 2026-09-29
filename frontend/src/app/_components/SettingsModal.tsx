@@ -179,7 +179,7 @@ export function SettingsModals({
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Audio Device Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Audio device settings</h3>
             <button
               onClick={() => onClose('deviceSettings')}
               className="tetro-icon" aria-label="Close" title="Close"
@@ -251,7 +251,7 @@ export function SettingsModals({
     {modals.errorAlert && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <Alert className="max-w-md mx-4 border-red-200 bg-white shadow-xl">
-          <AlertTitle className="text-red-800">Recording Stopped</AlertTitle>
+          <AlertTitle className="text-red-800">Recording stopped</AlertTitle>
           <AlertDescription className="text-red-700">
             {messages.errorAlert}
             <button
@@ -269,7 +269,7 @@ export function SettingsModals({
     {modals.chunkDropWarning && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <Alert className="max-w-lg mx-4 border-yellow-200 bg-white shadow-xl">
-          <AlertTitle className="text-yellow-800">Transcription Performance Warning</AlertTitle>
+          <AlertTitle className="text-yellow-800">Transcription performance warning</AlertTitle>
           <AlertDescription className="text-yellow-700">
             {messages.chunkDropWarning}
             <button

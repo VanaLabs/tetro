@@ -3,12 +3,8 @@
 import { motion } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { useRouter } from 'next/navigation';
+import { openSummaryModelChoices } from '@/lib/model-settings-route';
 
 interface EmptyStateSummaryProps {
   onGenerate: () => void;
@@ -28,6 +24,8 @@ export function EmptyStateSummary({
   error = null,
   suggestion = null,
 }: EmptyStateSummaryProps) {
+  const router = useRouter();
+  const chooseModel = () => openSummaryModelChoices(href => router.push(href));
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -37,7 +35,7 @@ export function EmptyStateSummary({
     >
       <h3>No summary yet</h3>
       <p>
-        {hasTranscript ? 'Tetro can turn this transcript into key points, decisions and action items.' : 'Transcribe the recording first. You can create a summary once there’s some text.'}
+        {hasTranscript ? 'Choose a template and turn this transcript into a summary that fits the recording.' : 'Transcribe the recording first. You can create a summary once there’s some text.'}
       </p>
 
       {suggestion && (
@@ -50,33 +48,14 @@ export function EmptyStateSummary({
         </p>
       )}
 
-      {hasTranscript && <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div>
-              <Button
-                onClick={onGenerate}
-                disabled={!hasModel || !hasTranscript || isGenerating}
-                className="tetro-key tetro-key-amber"
-              >
-                <Sparkles className="w-4 h-4" />
-                {isGenerating ? 'Generating…' : error ? 'Try again' : 'Summarize'}
-              </Button>
-            </div>
-          </TooltipTrigger>
-          {hasTranscript && !hasModel && (
-            <TooltipContent>
-              <p>Please select a model in Settings first</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-      </TooltipProvider>}
-
-      {hasTranscript && !hasModel && (
-        <p className="tetro-empty-hint">
-          Choose a summary model in Settings first
-        </p>
-      )}
+      {hasTranscript && <Button
+        onClick={hasModel ? onGenerate : chooseModel}
+        disabled={isGenerating}
+        className="tetro-key tetro-key-amber"
+      >
+        <Sparkles className="w-4 h-4" />
+        {!hasModel ? 'Choose summary model' : isGenerating ? 'Generating…' : error ? 'Try again' : 'Write summary'}
+      </Button>}
     </motion.div>
   );
 }

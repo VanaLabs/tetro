@@ -26,6 +26,7 @@ const FORMATS: { value: SectionFormat; label: string; hint: string }[] = [
 ];
 
 const EXAMPLES = [
+  'Catch up with friends',
   'Weekly check-in with my team. Start with wins, then problems, then who does what before next week.',
   'First call with a new client. I need their goals, budget, deadlines, concerns and the next steps we agreed.',
   'Job interview. Capture the candidate’s background, strengths, concerns and my overall impression.',
@@ -46,6 +47,7 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
   const [draft, setDraft] = useState<TemplateBody>(initial ?? { name: '', description: '', sections: [emptySection()] });
   const [drafting, setDrafting] = useState(false);
   const [draftedWith, setDraftedWith] = useState('');
+  const [draftNotice, setDraftNotice] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -69,7 +71,7 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
       if (raw) {
         const saved = JSON.parse(raw);
         if (saved.draft?.sections && Array.isArray(saved.draft.sections)) {
-          setDraft(saved.draft); setBrief(saved.brief ?? ''); setStep(saved.step === 'edit' ? 'edit' : 'describe'); setDraftedWith(saved.draftedWith ?? ''); setRecovered(true);
+          setDraft(saved.draft); setBrief(saved.brief ?? ''); setStep(saved.step === 'edit' ? 'edit' : 'describe'); setDraftedWith(saved.draftedWith ?? ''); setDraftNotice(saved.draftNotice ?? ''); setRecovered(true);
         }
       }
     } catch { setDraftStorageError(true); }
@@ -78,11 +80,11 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
   useEffect(() => {
     if (!draftReady) return;
     try {
-      if (dirty) localStorage.setItem(draftKey, JSON.stringify({ draft, brief, step, draftedWith }));
+      if (dirty) localStorage.setItem(draftKey, JSON.stringify({ draft, brief, step, draftedWith, draftNotice }));
       else localStorage.removeItem(draftKey);
       setDraftStorageError(false);
     } catch { setDraftStorageError(true); }
-  }, [draftReady, draftKey, dirty, draft, brief, step, draftedWith]);
+  }, [draftReady, draftKey, dirty, draft, brief, step, draftedWith, draftNotice]);
 
   useEffect(() => {
     invoke<{ provider?: string; model?: string; ollamaEndpoint?: string | null } | null>('api_get_model_config')
@@ -102,10 +104,11 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
     draftJob.current = requestId; stopRequested.current = false;
     setStopping(false); setDrafting(true); setError('');
     try {
-      const result = await invoke<{ template: TemplateBody; model_label: string }>('api_draft_template', { description: brief, requestId });
+      const result = await invoke<{ template: TemplateBody; model_label: string; notice?: string | null }>('api_draft_template', { description: brief, requestId });
       if (id !== request.current || stopRequested.current) return;
       setDraft({ ...result.template, sections: result.template.sections.map(s => ({ ...s, format: (FORMATS.some(f => f.value === s.format) ? s.format : 'paragraph') as SectionFormat })) });
       setDraftedWith(result.model_label);
+      setDraftNotice(result.notice ?? '');
       setStep('edit');
     } catch (e) {
       if (id === request.current && !stopRequested.current) setError(String(e));
@@ -135,7 +138,7 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
     if (!draft.sections.length) list.push('Add at least one section.');
     draft.sections.forEach((s, i) => {
       if (!s.title.trim()) list.push(`Section ${i + 1} needs a title.`);
-      if (!s.instruction.trim()) list.push(`Section ${i + 1} needs a note about what to write.`);
+      if (!s.instruction.trim()) list.push(`Section ${i + 1} needs an instruction about what to write.`);
     });
     return list;
   }, [draft]);
@@ -169,7 +172,7 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
     <header className="tetro-editor-head">
       <div>
         <h2>{templateId ? 'Edit template' : 'New template'}</h2>
-        <p>{step === 'describe' ? 'Describe the meeting and Tetro drafts a template you can change.' : 'Change anything you like. Save template when it’s ready to use.'}</p>
+        <p>{step === 'describe' ? 'Describe the recording and Tetro drafts a template you can change.' : 'Change anything you like. Save template when it’s ready to use.'}</p>
       </div>
       <button className="tetro-icon" onClick={requestClose} aria-label="Close editor" title="Close"><X /></button>
     </header>
@@ -178,7 +181,8 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
     {step === 'describe' ? <div className="tetro-editor-body tetro-describe">
       <label htmlFor="tetro-brief">What kind of meeting is this for?</label>
       <textarea id="tetro-brief" value={brief} onChange={e => setBrief(e.target.value)} rows={5} autoFocus disabled={drafting}
-        placeholder="Describe the meeting and what you want in the summary. You can list the sections you want, in order." />
+        placeholder="A few words are enough, such as ‘Catch up with friends’. Add any sections you want, or let Tetro suggest a layout." aria-describedby="tetro-brief-hint" />
+      <p id="tetro-brief-hint" className="tetro-muted">Describe the kind of recording. No names or example conversation needed.</p>
       <div className="tetro-examples" aria-label="Examples">
         <span>Try an example:</span>
         {EXAMPLES.map(example => <button key={example} type="button" onClick={() => setBrief(example)} disabled={drafting}>{example.split('.')[0]}</button>)}
@@ -186,17 +190,18 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
       <p className={`tetro-model-note ${isLocal ? 'is-local' : ''}`}><i aria-hidden="true" />{modelNote}{model === null && <> <button type="button" className="tetro-link" onClick={() => { sessionStorage.setItem('tetro.settingsTab', 'summaryModels'); router.push('/settings'); }}>Open summary settings</button></>}</p>
       {error && <p role="alert" className="tetro-editor-error">{error}</p>}
       <div className="tetro-editor-actions">
-        <button type="button" className="tetro-key" onClick={() => { setStep('edit'); setError(''); }} disabled={drafting}>Start from scratch</button>
+        <button type="button" className="tetro-key" onClick={() => { setStep('edit'); setError(''); setDraftNotice(''); }} disabled={drafting}>Start from scratch</button>
         {drafting
           ? <><span className="tetro-drafting" role="status"><i aria-hidden="true" />Drafting… a local model can take up to a minute.</span><button type="button" className="tetro-key" disabled={stopping} onClick={() => void stopDrafting()}>{stopping ? 'Stopping…' : 'Stop'}</button></>
-          : <button type="button" className="tetro-key tetro-key-amber" onClick={() => void draftTemplate()} disabled={!model || brief.trim().length < 10}><Sparkles />Draft template</button>}
+          : <button type="button" className="tetro-key tetro-key-amber" onClick={() => void draftTemplate()} disabled={!model || brief.trim().length < 3}><Sparkles />Draft template</button>}
       </div>
     </div> : <div className="tetro-editor-body">
+      {draftNotice && <p role="status" className="tetro-model-note">{draftNotice}</p>}
       {draftedWith && <p className="tetro-model-note is-local"><i aria-hidden="true" />Drafted by {draftedWith}. Read it through and change anything that doesn’t fit.</p>}
       <div className="tetro-editor-grid">
         <div className="tetro-editor-form">
           <label className="tetro-field"><span>Name</span><input value={draft.name} onChange={e => update({ name: e.target.value })} placeholder="e.g. Client check-in" aria-invalid={showErrors && !draft.name.trim()} /></label>
-          <label className="tetro-field"><span>What it’s for</span><input value={draft.description} onChange={e => update({ description: e.target.value })} placeholder="e.g. Notes for weekly calls with clients" aria-invalid={showErrors && !draft.description.trim()} /></label>
+          <label className="tetro-field"><span>What it’s for</span><input value={draft.description} onChange={e => update({ description: e.target.value })} placeholder="e.g. Summaries of weekly client calls" aria-invalid={showErrors && !draft.description.trim()} /></label>
 
           <h3>Sections <small>in the order they appear in the summary</small></h3>
           <ol className="tetro-section-list">
@@ -227,7 +232,7 @@ export function TemplateEditor({ templateId, initial, onSaved, onClose }: Props)
             <b className="tetro-preview-title">{draft.name.trim() || 'Meeting title'}</b>
             {draft.sections.map((s, i) => <div key={i} className="tetro-preview-section">
               <b>{s.title.trim() || `Section ${i + 1}`}</b>
-              {s.format === 'list' ? <ul>{templateExample(s).map((line,i) => <li key={i}>{line}</li>)}</ul> : <p>{templateExample(s)[0]}</p>}
+              {s.format === 'list' ? <ul>{templateExample(s, templateId).map((line,i) => <li key={i}>{line}</li>)}</ul> : <p>{templateExample(s, templateId)[0]}</p>}
             </div>)}
           </div>
         </aside>

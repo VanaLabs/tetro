@@ -64,6 +64,9 @@ function DownloadToastContent({
 
   return (
     <div className="flex items-center gap-3 w-full max-w-sm bg-white rounded-lg shadow-lg border border-gray-200 p-3 relative">
+      <button type="button" onClick={onDismiss} className="absolute right-2 top-2 rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500" aria-label={`Close ${download.displayName} download status`} title="Close">
+        <X className="h-4 w-4" />
+      </button>
 
       {/* Icon */}
       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${isComplete ? 'bg-green-100' : hasError ? 'bg-red-100' : isCancelled ? 'bg-gray-100' : 'bg-gray-100'
@@ -82,7 +85,7 @@ function DownloadToastContent({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 mb-1">
-          <p className="text-sm font-medium text-gray-900 truncate">
+          <p className="pr-6 text-sm font-medium text-gray-900 truncate">
             {download.displayName}
           </p>
         </div>
@@ -147,15 +150,21 @@ export function useDownloadProgressToast() {
     });
   }, []);
 
-  const cleanupDownload = useCallback((modelName: string, delay: number = 4000) => {
+  const cleanupDownload = useCallback((modelName: string, delay: number, expectedStatus: DownloadProgress['status']) => {
     // Remove download from map after delay (allows toast to show and auto-dismiss)
     setTimeout(() => {
       setDownloads((prev) => {
         const updated = new Map(prev);
-        updated.delete(modelName);
+        if (updated.get(modelName)?.status === expectedStatus) updated.delete(modelName);
         return updated;
       });
     }, delay);
+  }, []);
+
+  const dismissCancelledDownload = useCallback((modelName: string) => {
+    toast.dismiss(`download-${modelName}`);
+    setDownloads(prev => { const next = new Map(prev); next.delete(modelName); return next; });
+    setDismissedModels(prev => { const next = new Set(prev); next.delete(modelName); return next; });
   }, []);
 
   const showDownloadToast = useCallback((download: DownloadProgress) => {
@@ -165,7 +174,7 @@ export function useDownloadProgressToast() {
     const getDuration = () => {
       switch (download.status) {
         case 'completed': return 3000;      // 3 seconds
-        case 'cancelled': return 5000;      // 5 seconds
+        case 'cancelled': return 0;
         case 'error': return 10000;         // 10 seconds
         case 'downloading': return Infinity; // Manual dismiss only
       }
@@ -241,10 +250,11 @@ export function useDownloadProgressToast() {
               : 'downloading',
         };
 
-        updateDownload(modelName, downloadData);
         if (downloadData.status === 'cancelled') {
-          cleanupDownload(modelName, 6000);
+          dismissCancelledDownload(modelName);
+          return;
         }
+        updateDownload(modelName, downloadData);
       }
     );
 
@@ -263,7 +273,7 @@ export function useDownloadProgressToast() {
         };
         updateDownload(modelName, downloadData);
         // Clean up after 4 seconds (completion toast duration is 3s + 1s buffer)
-        cleanupDownload(modelName, 4000);
+        cleanupDownload(modelName, 4000, 'completed');
       }
     );
 
@@ -283,7 +293,7 @@ export function useDownloadProgressToast() {
         };
         updateDownload(modelName, downloadData);
         // Clean up after 11 seconds (error toast duration is 10s + 1s buffer)
-        cleanupDownload(modelName, 11000);
+        cleanupDownload(modelName, 11000, 'error');
       }
     );
 
@@ -292,7 +302,7 @@ export function useDownloadProgressToast() {
       unlistenComplete.then((fn) => fn());
       unlistenError.then((fn) => fn());
     };
-  }, [updateDownload, cleanupDownload]);
+  }, [updateDownload, cleanupDownload, dismissCancelledDownload]);
 
   // Listen to Built-in AI summary model download events
   useEffect(() => {
@@ -315,32 +325,35 @@ export function useDownloadProgressToast() {
         totalMb: getDownloadTotalMb(total_mb, model),
         speedMbps: speed_mbps ?? 0,
         unitLabel: 'MiB',
-        status: status === 'completed' || progress >= 100
-          ? 'completed'
-          : status === 'cancelled'
+        status: status === 'cancelled'
             ? 'cancelled'
             : status === 'error'
               ? 'error'
+              : status === 'completed'
+                ? 'completed'
               : 'downloading',
         error: status === 'error' ? categorizeError(error || 'Download failed') : undefined,
       };
+
+      if (downloadData.status === 'cancelled') {
+        dismissCancelledDownload(model);
+        return;
+      }
 
       updateDownload(model, downloadData);
 
       // Clean up finished downloads after delay to prevent endless toasts
       if (downloadData.status === 'completed') {
-        cleanupDownload(model, 4000);  // 3s toast + 1s buffer
+        cleanupDownload(model, 4000, 'completed');  // 3s toast + 1s buffer
       } else if (downloadData.status === 'error') {
-        cleanupDownload(model, 11000); // 10s toast + 1s buffer
-      } else if (downloadData.status === 'cancelled') {
-        cleanupDownload(model, 6000);  // 5s toast + 1s buffer
+        cleanupDownload(model, 11000, 'error'); // 10s toast + 1s buffer
       }
     });
 
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [updateDownload, cleanupDownload]);
+  }, [updateDownload, cleanupDownload, dismissCancelledDownload]);
 
   return { downloads };
 }

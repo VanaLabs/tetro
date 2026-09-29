@@ -137,7 +137,7 @@ fn get_cached_model_path(app_data_dir: &PathBuf, model_name: &str) -> Result<Pat
 ///
 /// # Arguments
 /// * `app_data_dir` - Application data directory (for model resolution)
-/// * `model_name` - Model name (e.g., "gemma3:1b")
+/// * `model_name` - Model name (e.g., "qwen3.5:2b")
 /// * `system_prompt` - System instructions for the model
 /// * `user_prompt` - User message/task
 /// * `cancellation_token` - Optional token for cancellation
@@ -150,6 +150,7 @@ pub async fn generate_with_builtin(
     system_prompt: &str,
     user_prompt: &str,
     max_tokens: Option<u32>,
+    temperature: Option<f32>,
     cancellation_token: Option<&CancellationToken>,
 ) -> Result<String> {
     let _slot = generation_slot(cancellation_token).await?;
@@ -211,7 +212,7 @@ pub async fn generate_with_builtin(
         max_tokens: Some(max_tokens.map(|n| n.min(i32::MAX as u32) as i32).unwrap_or(models::DEFAULT_MAX_TOKENS)),
         context_size: Some(model_def.context_size),
         model_path: Some(model_path.to_string_lossy().to_string()),
-        temperature: Some(sampling.temperature),
+        temperature: Some(temperature.filter(|t| t.is_finite()).map(|t| t.clamp(0.0, 2.0)).unwrap_or(sampling.temperature)),
         top_k: Some(sampling.top_k),
         top_p: Some(sampling.top_p),
         presence_penalty: Some(sampling.presence_penalty),

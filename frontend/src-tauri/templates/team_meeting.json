@@ -1,0 +1,26 @@
+{
+  "name": "Team Meeting",
+  "description": "Recap a conversation between two people or a small group without assuming a formal meeting process.",
+  "sections": [
+    {
+      "title": "Meeting Overview",
+      "instruction": "Summarize what this one-on-one or group conversation covered, and mention its purpose or outcome only when the recording makes them clear.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Discussion",
+      "instruction": "Capture the main topics, viewpoints, and useful details. Attribute a point to someone only when the speaker is clear; do not assume job roles, a fixed agenda, or a particular team method.",
+      "format": "list"
+    },
+    {
+      "title": "Agreements & Open Questions",
+      "instruction": "Include agreements and unresolved questions when they matter. Clearly distinguish what was settled from what is still being considered; omit this section if neither applies.",
+      "format": "list"
+    },
+    {
+      "title": "Action Items",
+      "instruction": "List only follow-up actions explicitly agreed or assigned, with owner and timing only when stated. Omit this section when no actions were agreed.",
+      "format": "list"
+    }
+  ]
+}

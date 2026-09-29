@@ -7,7 +7,7 @@ import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import { textUpdated, TRASH_UPDATED } from '@/lib/meeting-edits';
 
 type Item = { id: string; meeting_id: string; title: string; created_at: string; parts: { transcript: boolean; summary: boolean; audio: boolean } };
-const label = (item: Item) => Object.values(item.parts).every(Boolean) ? 'Entire meeting' : [item.parts.transcript && 'Transcript', item.parts.summary && 'Notes', item.parts.audio && 'Audio'].filter(Boolean).join(', ');
+const label = (item: Item) => Object.values(item.parts).every(Boolean) ? 'Entire meeting' : [item.parts.transcript && 'Transcript', item.parts.summary && 'Summary', item.parts.audio && 'Audio'].filter(Boolean).join(', ');
 
 export default function TrashPage() {
   const { refetchMeetings } = useSidebar();
@@ -41,9 +41,9 @@ export default function TrashPage() {
     {error && <p role="alert" className="tetro-editor-error tetro-page-error">{error} <button className="tetro-link" onClick={() => void load()}>Try again</button></p>}
     <div className="tetro-template-columns"><article className="tetro-trash-list">
       {items === null ? <p>Loading Trash…</p> : !items.length ? <div className="tetro-template-empty"><p>Trash is empty.</p><small>Meetings and items you remove will appear here.</small></div> : items.map(item => <div key={item.id} className="tetro-trash-item">
-        <div><strong>{item.title}</strong><small>{label(item)} · {new Date(item.created_at).toLocaleDateString()}</small></div>
+        <div><strong>{item.title}</strong><small>{label(item)} · {new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</small></div>
         <button className="tetro-key" disabled={busy} onClick={() => void restore(item)}><RotateCcw />Restore</button>
-        <button className="tetro-icon" disabled={busy} title="Delete permanently" aria-label={`Permanently delete ${label(item).toLowerCase()} from ${item.title}`} onClick={() => setRemove(item)}><Trash2 /></button>
+        <button className="tetro-key tetro-key-square" disabled={busy} title="Delete permanently" aria-label={`Permanently delete ${label(item).toLowerCase()} from ${item.title}`} onClick={() => setRemove(item)}><Trash2 /></button>
       </div>)}
     </article></div>
     <Dialog open={!!remove} onOpenChange={open => { if (!open && !busy) setRemove(null); }}><DialogContent>

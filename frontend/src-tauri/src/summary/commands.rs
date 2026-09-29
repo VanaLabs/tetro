@@ -515,7 +515,7 @@ pub async fn api_process_transcript<R: Runtime>(
     // ponytail: summary starts are rare; use per-meeting locks only if start contention is measured.
     let _start_guard = SUMMARY_START_LOCK.lock().await;
     let started_at = next_summary_start(Utc::now());
-    crate::meeting_edits::save_version(&pool, &m_id, "summary", "Before generating notes").await.map_err(|e|e.to_string())?;
+    crate::meeting_edits::save_version(&pool, &m_id, "summary", "Before generating summary").await.map_err(|e|e.to_string())?;
     SummaryProcessesRepository::create_or_reset_process(&pool, &m_id, started_at)
         .await
         .map_err(|e| format!("Failed to initialize process: {}", e))?;

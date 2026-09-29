@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
+import { sortTemplates } from '@/lib/template-catalog';
 
 type Template = { id: string; name: string; description: string };
 
@@ -19,7 +20,7 @@ export function useTemplates(meetingId?: string) {
       meetingId ? invoke<{ template_id: string | null }>('api_get_meeting_preferences', { meetingId }) : Promise.resolve(null),
     ]).then(([templates, saved]) => {
       if (version !== generation.current) return;
-      setAvailableTemplates(templates);
+      setAvailableTemplates(sortTemplates(templates));
       if (saved?.template_id && templates.some(t => t.id === saved.template_id)) setSelectedTemplate(saved.template_id);
     }).catch(error => {
       if (version === generation.current) toast.error('Couldn’t load the meeting’s template', { description: String(error) });

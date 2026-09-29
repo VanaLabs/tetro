@@ -19,6 +19,7 @@ export type ProcessingSpeed = 'Slow' | 'Medium' | 'Fast' | 'Very Fast' | 'Ultra 
 export type ModelStatus =
   | 'Available'
   | 'Missing'
+  | { Paused: { downloaded_bytes: number } }
   | { Downloading: { progress: number } }
   | { Error: string }
   | { Corrupted: { file_size: number; expected_min_size: number } };

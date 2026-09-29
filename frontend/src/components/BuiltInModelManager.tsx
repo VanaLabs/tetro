@@ -16,13 +16,15 @@ import { RefreshCw, BadgeAlert, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatSummaryModelSizeLabelFromMb } from '@/lib/onboarding-summary-model';
 import { summaryDisplayName } from '@/lib/model-display';
+import { RECOMMENDED_SUMMARY_MODEL } from '@/lib/recommended-models';
 
 interface ModelInfo {
   name: string;
   display_name: string;
   status: {
-    type: 'not_downloaded' | 'downloading' | 'available' | 'corrupted' | 'error';
+    type: 'not_downloaded' | 'downloading' | 'paused' | 'available' | 'corrupted' | 'error';
     progress?: number;
+    downloaded_mb?: number;
   };
   size_mb: number;
   context_size: number;
@@ -54,7 +56,7 @@ export function BuiltInModelManager({
   layout = 'inline',
   autoSelect = true,
   variant = 'cards',
-  scope, recommendedId = 'qwen3.5:2b',
+  scope, recommendedId = RECOMMENDED_SUMMARY_MODEL,
 }: BuiltInModelManagerProps) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   useEffect(() => subscribeModelCatalog<ModelInfo[]>('builtin_ai_list_models', setModels), []);
@@ -63,6 +65,7 @@ export function BuiltInModelManager({
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
   const [downloadProgressInfo, setDownloadProgressInfo] = useState<Record<string, DownloadProgressInfo>>({});
   const [downloadingModels, setDownloadingModels] = useState<Set<string>>(new Set());
+  const [cancellingModels, setCancellingModels] = useState<Set<string>>(new Set());
 
   const fetchModels = async () => {
     try {
@@ -149,6 +152,7 @@ export function BuiltInModelManager({
 
         // Handle cancelled status
         if (status === 'cancelled') {
+          setCancellingModels(prev => { const next = new Set(prev); next.delete(model); return next; });
           setDownloadingModels((prev) => {
             const newSet = new Set(prev);
             newSet.delete(model);
@@ -184,24 +188,9 @@ export function BuiltInModelManager({
             return rest;
           });
 
-          // Update model status to error locally instead of fetching from backend
-          // Backend doesn't persist error status, so fetchModels() would return not_downloaded
-          setModels((prevModels) =>
-            prevModels.map((m) =>
-              m.name === model
-                ? {
-                    ...m,
-                    status: {
-                      type: 'error',
-                      progress: 0,
-                    } as any,
-                  }
-                : m
-            )
-          );
-
-          // Don't show error toast here - DownloadProgressToast already handles it
-          // Don't call fetchModels() - it would overwrite error status with not_downloaded
+          // A failed transfer may leave useful partial bytes. Read the native status
+          // so the row can offer Resume and Delete instead of hiding that file.
+          fetchModels();
         }
       });
     };
@@ -232,9 +221,7 @@ export function BuiltInModelManager({
         return;
       }
 
-      // For real errors, show toast and remove from downloading
-      toast.error(`Failed to download ${modelName}`);
-
+      // The progress listener reports the error and refreshes the partial-file state.
       setDownloadingModels((prev) => {
         const newSet = new Set(prev);
         newSet.delete(modelName);
@@ -247,9 +234,9 @@ export function BuiltInModelManager({
   };
 
   const cancelDownload = async (modelName: string) => {
+    setCancellingModels(prev => new Set(prev).add(modelName));
     try {
       await invoke('builtin_ai_cancel_download', { modelName });
-      toast.info(`Download of ${modelName} cancelled`);
       setDownloadingModels((prev) => {
         const newSet = new Set(prev);
         newSet.delete(modelName);
@@ -257,6 +244,9 @@ export function BuiltInModelManager({
       });
     } catch (error) {
       console.error('Failed to cancel download:', error);
+      toast.error('Couldn’t stop the download', { description: String(error) });
+    } finally {
+      setCancellingModels(prev => { const next = new Set(prev); next.delete(modelName); return next; });
     }
   };
 
@@ -265,7 +255,7 @@ export function BuiltInModelManager({
     const info = models.find(m => m.name === modelName);
     const ok = await confirm({
       title: `Remove ${summaryDisplayName(modelName, info?.display_name)}?`,
-      body: <>{info?.size_mb ? `This frees ${formatSummaryModelSizeLabelFromMb(info.size_mb)}. ` : ''}You can download it again. {modelUseNote('builtin-ai', modelName, selectedModel === modelName)}</>,
+      body: <>{info?.status.type === 'paused' ? `This deletes the ${info.status.downloaded_mb ?? 0} MiB partial download. ` : info?.size_mb ? `This frees ${formatSummaryModelSizeLabelFromMb(info.size_mb)}. ` : ''}You can download it again. {modelUseNote('builtin-ai', modelName, selectedModel === modelName)}</>,
       confirm: 'Delete',
     });
     if (!ok) return;
@@ -306,11 +296,12 @@ export function BuiltInModelManager({
         {confirmDialog}
         {models.filter(m => scope === 'recommended' ? m.name === recommendedId : scope === 'installed' ? m.status.type === 'available' : scope === 'more' ? m.status.type !== 'available' : true).map((model) => {
           const t = model.status.type;
-          const state: ModelRowState = downloadingModels.has(model.name) ? { kind: 'downloading', progress: downloadProgress[model.name] ?? 0 }
+          const state: ModelRowState = cancellingModels.has(model.name) ? { kind: 'cancelling' } : downloadingModels.has(model.name) ? { kind: 'downloading', progress: downloadProgress[model.name] ?? 0 }
             : t === 'available' ? { kind: 'ready' } : t === 'corrupted' ? { kind: 'corrupted' }
+            : t === 'paused' ? { kind: 'paused', downloadedMb: model.status.downloaded_mb ?? 0 }
             : t === 'error' ? { kind: 'error', message: (model.status as any).Error } : { kind: 'missing' };
           return (
-            <ModelRow key={model.name} name={summaryDisplayName(model.name, model.display_name)} note={`Summaries · ${model.description}`}
+            <ModelRow key={model.name} name={summaryDisplayName(model.name, model.display_name)} note={t === 'paused' ? `Paused · ${model.status.downloaded_mb ?? 0} MiB kept on this device. Resume or delete it.` : `Summaries · ${model.description}`}
               badge={model.name === recommendedId ? <span className="tetro-recommended">Recommended</span> : undefined}
               sizeMb={model.size_mb} sizeLabel={formatSummaryModelSizeLabelFromMb(model.size_mb)} extra={`${Math.round(model.context_size / 1000)}k context`}
               inUse={selectedModel === model.name} state={state}
@@ -341,6 +332,7 @@ export function BuiltInModelManager({
           const modelIsDownloading = downloadingModels.has(model.name);
           const isAvailable = model.status.type === 'available';
           const isNotDownloaded = model.status.type === 'not_downloaded';
+          const isPaused = model.status.type === 'paused';
           const isCorrupted = model.status.type === 'corrupted';
           const isError = model.status.type === 'error';
 
@@ -403,6 +395,10 @@ export function BuiltInModelManager({
                       Download
                     </button>
                   )}
+                  {isPaused && !modelIsDownloading && <>
+                    <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); void deleteModel(model.name); }}>Delete</Button>
+                    <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); void downloadModel(model.name); }}>Resume</Button>
+                  </>}
                   {/* Downloading - Show Cancel button */}
                   {modelIsDownloading && (
                     <Button

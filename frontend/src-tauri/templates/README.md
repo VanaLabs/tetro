@@ -1,56 +1,31 @@
-# Meeting Summary Templates
+# Summary Templates
 
-This directory contains template definitions for meeting summary generation.
+This directory contains the built-in structures used to summarize recordings.
 
 ## Available Templates
 
-### 1. `daily_standup.json`
-Time-boxed daily updates template designed for engineering/product teams.
+The picker puts the four everyday choices first:
 
-**Sections:**
-- Date
-- Attendees
-- Yesterday (completed work)
-- Today (planned work)
-- Blockers
-- Notes
+| File | Name | Use |
+| --- | --- | --- |
+| `standard_meeting.json` | General Summary | Flexible default for any recording; no required decisions, actions, or tables. |
+| `ideas_and_notes.json` | Ideas & Notes | Solo thoughts and brainstorming; ideas remain separate from commitments. |
+| `team_meeting.json` | Team Meeting | A one-on-one or small group conversation, without a required business process. |
+| `interview.json` | Interview | Answers, examples, a labeled subjective review, and up to two improvement suggestions. STAR applies only to behavioral job interviews. |
 
-### 2. `standard_meeting.json`
-General-purpose meeting notes template focusing on key outcomes and actions.
+More focused choices:
 
-**Sections:**
-- Summary
-- Key Decisions
-- Action Items
-- Discussion Highlights
+| File | Name | Use |
+| --- | --- | --- |
+| `daily_standup.json` | Daily Standup | Yesterday, today, and blockers. |
+| `plan.json` | Plan & Next Steps | Goals, workstreams, milestones, and next actions. |
+| `project_sync.json` | Project Sync / Status Update | Progress, milestones, risks, and decisions. |
+| `retrospective.json` | Team Retrospective (Agile) | Start, stop, continue, and improvement actions. |
+| `sales_marketing_client_call.json` | Client / Sales Meeting | Client goals, terms, concerns, and follow-up. |
+| `podcast_pre_interview.json` | Podcast | Recap a guest or solo episode. |
+| `psychatric_session.json` | Therapy Visit | Personal recap of a visit; include diagnoses or medication only if actually discussed. |
 
-### 3. `podcast_pre_interview.json`
-Podcast preparation template for organizing guest context, talking points, episode angles, interview questions, boundaries, logistics, and follow-up.
-
-**Sections:**
-- Interview Context
-- Guest Profile and Expertise
-- Stories and Key Talking Points
-- Potential Episode Angles
-- Questions to Prepare
-- Boundaries and Verification Points
-- Recording Logistics
-- Open Questions
-- Follow-up Actions
-
-### 4. `plan.json`
-Turns an informal voice note or idea into an executable plan with goals, workstreams, a Mermaid workflow graph, milestones, ownership, risks, open questions, and next actions.
-
-**Sections:**
-- Plan Overview
-- Goals & Success Criteria
-- Scope, Inputs & Constraints
-- Workstreams & Deliverables
-- Workflow Graph
-- Timeline & Milestones
-- Roles, Ownership & Handoffs
-- Risks, Dependencies & Open Questions
-- Next Actions
+Some filenames retain earlier IDs so saved template choices continue to work. Sections without relevant content should be omitted, and no template should invent transcript facts.
 
 ## Template Structure
 
@@ -109,5 +84,5 @@ let available = templates::list_templates();
 
 // Validate custom template JSON
 let custom_json = std::fs::read_to_string("custom.json")?;
-let validated = templates::validate_template(&custom_json)?;
+let validated = templates::validate_and_parse_template(&custom_json)?;
 ```

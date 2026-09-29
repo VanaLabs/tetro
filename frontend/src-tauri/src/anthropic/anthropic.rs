@@ -61,7 +61,11 @@ fn is_chat_model(model_id: &str) -> bool {
 /// # Returns
 /// Vector of models returned by the provider. Errors never masquerade as a verified catalog.
 #[command]
-pub async fn get_anthropic_models(api_key: Option<String>) -> Result<Vec<AnthropicModel>, String> {
+pub async fn get_anthropic_models(state: tauri::State<'_, crate::state::AppState>, api_key: Option<String>) -> Result<Vec<AnthropicModel>, String> {
+    let api_key = match api_key {
+        None => crate::database::repositories::setting::SettingsRepository::get_api_key(state.db_manager.pool(), "claude").await.map_err(|e| e.to_string())?,
+        value => value,
+    };
     let api_key = match api_key {
         Some(key) if !key.trim().is_empty() => key.trim().to_string(),
         _ => return Err("Connect Anthropic Claude to check its summary models".to_string()),
@@ -84,7 +88,7 @@ pub async fn get_anthropic_models(api_key: Option<String>) -> Result<Vec<Anthrop
 
     // Fetch from API
     log::info!("Fetching Anthropic models from API...");
-    let client = reqwest::Client::new();
+    let client = crate::network_security::client()?;
 
     let response = match client
         .get("https://api.anthropic.com/v1/models")

@@ -46,7 +46,7 @@ export function VocabularyEditor() {
       <BookA aria-hidden="true" />
       <div>
         <h3 id="tetro-vocab-title">Names &amp; terms</h3>
-        <p>Add names, companies and specialist words to help Tetro spell them correctly. These hints are used by Whisper transcription and when writing notes. Other speech models do not use them yet; always check the result.</p>
+        <p>Add names, companies and specialist words to help Tetro spell them correctly. These hints are used by Whisper transcription and when writing summaries. Other speech models do not use them yet; always check the result.</p>
       </div>
       {terms && terms.length > 0 && <span className="tetro-tag">{terms.length}</span>}
     </div>

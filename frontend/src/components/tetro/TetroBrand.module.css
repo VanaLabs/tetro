@@ -1,7 +1,9 @@
 .lockup { display:inline-flex; flex:0 0 auto; align-items:center; color:var(--tetro-ink); vertical-align:middle; transition:color 180ms ease; }
 .wordmark { position:relative; display:block; width:116px; aspect-ratio:683/180; background:currentColor; -webkit-mask:url('/tetro/identity/wordmark.png') center/contain no-repeat; mask:url('/tetro/identity/wordmark.png') center/contain no-repeat; }
 .about .wordmark { width:172px; }
-.welcome .wordmark { width:178px; }
+.welcome .wordmark { width:min(168px,50vw); }
+.onboarding { transform:translateY(-.09em); }
+.onboarding .wordmark { width:clamp(87px,8vw,105px); }
 .icon { display:block; object-fit:contain; }
 .gradient { position:absolute; inset:0; background:linear-gradient(115deg,#ffca67 0%,#f7773d 26%,#cf394c 49%,#782d70 72%,#405386 100%); background-size:220% 220%; background-position:0% 50%; opacity:0; transition:opacity .988s ease-in-out; animation:brand-gradient 5.121s ease-in-out infinite alternate; animation-play-state:paused; }
 .signal { position:absolute; inset:0; display:flex; align-items:center; gap:1px; opacity:0; transition:opacity .25s ease; }
@@ -13,6 +15,8 @@
 .lockup[data-state='starting'][data-motion='on'] .wordmark { animation:brand-breathe 1.8s ease-in-out infinite; }
 :global(.tetro-brand-home):is(:hover,:focus-visible) .gradient { opacity:1; }
 :global(.tetro-brand-home):is(:hover,:focus-visible) .lockup[data-motion='on'] .gradient { animation-play-state:running; }
+.welcome .gradient,.onboarding .gradient { opacity:1; }
+.welcome[data-motion='on'] .gradient,.onboarding[data-motion='on'] .gradient { animation-play-state:running; }
 @keyframes brand-gradient { from { background-position:0% 50%; } to { background-position:100% 50%; } }
 @keyframes brand-breathe { 0%,100% { opacity:.6; } 50% { opacity:1; } }
 @media (prefers-reduced-motion:reduce) { .lockup,.wordmark,.icon,.gradient,.signal,.signal i { animation:none!important; transition:none!important; } }

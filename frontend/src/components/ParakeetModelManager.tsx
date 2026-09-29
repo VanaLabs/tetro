@@ -70,6 +70,15 @@ export function ParakeetModelManager({
     });
   };
 
+  const refreshRetainedDownload = async (modelName: string) => {
+    try {
+      const list = await ParakeetAPI.getAvailableModels();
+      const current = list.find(model => model.name === modelName);
+      if (current) latestStatusByModelRef.current.set(modelName, current.status);
+      publishModelCatalog('parakeet_get_available_models', list);
+    } catch (error) { console.error('Could not refresh retained download', error); }
+  };
+
   // Initialize and load models
   useEffect(() => {
     if (initialized || !listenersReady) return;
@@ -114,7 +123,8 @@ export function ParakeetModelManager({
           (event) => {
             const { modelName, progress, status } = event.payload;
             if (status === 'cancelled') {
-              latestStatusByModelRef.current.set(modelName, 'Missing');
+              latestStatusByModelRef.current.delete(modelName);
+              void refreshRetainedDownload(modelName);
               progressThrottleRef.current.delete(modelName);
               clearCancellingModel(modelName);
               setDownloadingModels(prev => {
@@ -208,6 +218,7 @@ export function ParakeetModelManager({
             const displayInfo = getModelDisplayInfo(modelName);
             const displayName = displayInfo?.friendlyName || modelName;
             latestStatusByModelRef.current.set(modelName, { Error: error });
+            void refreshRetainedDownload(modelName);
             clearCancellingModel(modelName);
 
             setModels(prevModels =>
@@ -348,6 +359,7 @@ export function ParakeetModelManager({
           model.name === modelName ? { ...model, status: { Error: errorMessage } } : model
         )
       );
+      await refreshRetainedDownload(modelName);
     }
   };
 
@@ -364,7 +376,7 @@ export function ParakeetModelManager({
     const info = models.find(m => m.name === modelName);
     const ok = await confirm({
       title: `Remove ${getModelDisplayName(modelName)}?`,
-      body: <>{info?.size_mb ? `This frees ${formatFileSize(info.size_mb)}. ` : ''}You can download it again. {modelUseNote('parakeet', modelName, selectedModel === modelName)}</>,
+      body: <>{info?.status && typeof info.status === 'object' && 'Paused' in info.status ? `This removes ${(info.status.Paused.downloaded_bytes / (1024 * 1024)).toFixed(1)} MB of saved download data. ` : info?.size_mb ? `This frees ${formatFileSize(info.size_mb)}. ` : ''}You can download it again. {modelUseNote('parakeet', modelName, selectedModel === modelName)}</>,
       confirm: 'Delete',
     });
     if (!ok) return;
@@ -373,6 +385,7 @@ export function ParakeetModelManager({
 
     try {
       await ParakeetAPI.deleteCorruptedModel(modelName);
+      latestStatusByModelRef.current.delete(modelName);
 
       // Refresh models list
       const modelList = await ParakeetAPI.getAvailableModels();

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
-type Info = { end?: string | null; model_provider?: string | null; model_name?: string | null };
+type Info = { end?: string | null; model_provider?: string | null; model_name?: string | null; data?: { generation_kind?: string } | null };
 const WHERE: Record<string, string> = { 'builtin-ai': 'on this device', ollama: 'via Ollama', openai: 'via OpenAI', claude: 'via Anthropic', groq: 'via Groq', openrouter: 'via OpenRouter', 'custom-openai': 'via your endpoint' };
 
 /** Quiet provenance line under a summary: when it was written and by which model. */
@@ -17,5 +17,6 @@ export function SummaryFooter({ meetingId, refreshKey }: { meetingId: string; re
   if (!info?.end && !info?.model_name) return null;
   const when = info.end ? new Date(info.end).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
   const model = info.model_name ? `${info.model_name}${info.model_provider && WHERE[info.model_provider] ? ` ${WHERE[info.model_provider]}` : ''}` : null;
+  if (info.data?.generation_kind === 'transcript_excerpt') return <p className="tetro-summary-footer">Transcript excerpt{when ? ` saved ${when}` : ''}<br />Kept brief because there is little recorded speech. Check the words against the audio.</p>;
   return <p className="tetro-summary-footer">Summary written{when ? ` ${when}` : ''}{model ? ` · ${model}` : ''}<br />Check names, decisions and dates against the transcript before sharing.</p>;
 }

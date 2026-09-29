@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { toast } from 'sonner';
+import { RECOMMENDED_SUMMARY_MODEL } from '@/lib/recommended-models';
 import { SettingGroup, SettingRow } from '@/components/tetro/SettingRow';
 import { VocabularyEditor } from '@/components/tetro/Vocabulary';
 import { OllamaModels, CustomServer } from '@/components/tetro/ModelSources';
@@ -38,12 +40,38 @@ const SECTIONS: { id: ModelsSection; label: string }[] = [
 ];
 
 /** Model management is organized by job, with connected services in their own section. */
-export function ModelsSettings({ section, onSectionChange }: { section: ModelsSection; onSectionChange: (section: ModelsSection) => void }) {
+export function ModelsSettings({ section, onSectionChange, browseSummaryOnOpen = false, browseTranscriptionOnOpen = false }: { section: ModelsSection; onSectionChange: (section: ModelsSection) => void; browseSummaryOnOpen?: boolean; browseTranscriptionOnOpen?: boolean }) {
   const { transcriptModelConfig, modelConfig, selectedLanguage } = useConfig();
-  const [notesRecommendation, setNotesRecommendation] = useState('qwen3.5:2b');
+  const [notesRecommendation, setNotesRecommendation] = useState(RECOMMENDED_SUMMARY_MODEL);
   useEffect(() => { let disposed = false; void invoke<string>('builtin_ai_get_recommended_model').then(model => { if (!disposed) setNotesRecommendation(model); }).catch(() => {}); return () => { disposed = true; }; }, []);
-  const [browseTranscription, setBrowseTranscription] = useState(false);
-  const [browseSummary, setBrowseSummary] = useState(false);
+  const [browseTranscription, setBrowseTranscription] = useState(browseTranscriptionOnOpen);
+  const transcriptionDownloads = useRef<HTMLElement>(null);
+  useEffect(() => { if (browseTranscriptionOnOpen) setBrowseTranscription(true); }, [browseTranscriptionOnOpen]);
+  useEffect(() => {
+    if (!browseTranscription || section !== 'transcription') return;
+    // Wait for the settings entrance animation before measuring its scroll container.
+    const timer = window.setTimeout(() => {
+      const heading = transcriptionDownloads.current;
+      const scroller = heading?.closest<HTMLElement>('[data-settings-scroll]');
+      if (!heading || !scroller) return;
+      const top = scroller.scrollTop + heading.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 24;
+      scroller.scrollTo({ top, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [browseTranscription, section]);
+  const [browseSummary, setBrowseSummary] = useState(browseSummaryOnOpen);
+  useEffect(() => { if (browseSummaryOnOpen) setBrowseSummary(true); }, [browseSummaryOnOpen]);
+  const [summaryReady, setSummaryReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (modelConfig.provider !== 'builtin-ai' || !modelConfig.model) { setSummaryReady(null); return; }
+    let active = true;
+    const check = () => { void invoke<boolean>('builtin_ai_is_model_ready', { modelName: modelConfig.model, refresh: true }).then(ready => { if (active) setSummaryReady(ready); }).catch(() => { if (active) setSummaryReady(false); }); };
+    check();
+    const unlisten = listen<{ model: string; status: string }>('builtin-ai-download-progress', event => {
+      if (event.payload.model === modelConfig.model && event.payload.status !== 'downloading') check();
+    });
+    return () => { active = false; void unlisten.then(fn => fn()); };
+  }, [modelConfig.provider, modelConfig.model]);
   const [speechFamily, setSpeechFamily] = useState<'all' | 'parakeet' | 'whisper'>('all');
   const [speechCoverage, setSpeechCoverage] = useState<'all' | 'multilingual' | 'armenian' | 'english'>('all');
   const inUse = (provider: string) => transcriptModelConfig.provider === provider ? transcriptModelConfig.model : undefined;
@@ -81,14 +109,14 @@ export function ModelsSettings({ section, onSectionChange }: { section: ModelsSe
       </div>
       <SettingGroup title="Installed on this device">{transcriptionRows('installed')}</SettingGroup>
       <details className="tetro-model-disclosure" open={browseTranscription} onToggle={event => setBrowseTranscription(event.currentTarget.open)}>
-        <summary>Browse transcription models <span>Download another language, family or size</span></summary>
+        <summary ref={transcriptionDownloads} style={{ scrollMarginTop: 24 }}>Download transcription models <span>Download another language, family or size</span></summary>
         {browseTranscription && <div className="tetro-model-disclosure-body">{transcriptionRows('more')}<p className="tetro-setting-note tetro-model-no-matches">No other models match these filters. Try another language or family.</p></div>}
       </details>
     </div>}
     {section === 'summary' && <div className="tetro-model-section" aria-labelledby="tetro-model-summary-heading">
       <h2 id="tetro-model-summary-heading">Summary models</h2>
-      <p>Write notes and draft templates on this device. Sizes are downloads; running a model needs additional memory. “Context” is the amount of text it can work with at once.</p>
-      <SettingGroup title="Current model"><SettingRow label="Summary model" hint={modelConfig.provider === 'builtin-ai' ? 'Runs on this device.' : <>{notesDestination(modelConfig.provider, modelConfig.ollamaEndpoint)}. <button type="button" className="tetro-link" onClick={() => onSectionChange('external')}>View external model</button></>}><ModelPicker purpose="notes" onGetMore={() => setBrowseSummary(true)} /></SettingRow></SettingGroup>
+      <p>Write summaries and draft templates on this device. Sizes are downloads; running a model needs additional memory. “Context” is the amount of text it can work with at once.</p>
+      <SettingGroup title="Current model"><SettingRow label="Summary model" hint={modelConfig.provider === 'builtin-ai' ? !modelConfig.model ? 'Choose a model to write summaries.' : summaryReady === false ? 'Download needed. Resume below or choose another model.' : 'Runs on this device.' : <>{notesDestination(modelConfig.provider, modelConfig.ollamaEndpoint)}. <button type="button" className="tetro-link" onClick={() => onSectionChange('external')}>View external model</button></>}><ModelPicker purpose="notes" onGetMore={() => setBrowseSummary(true)} /></SettingRow></SettingGroup>
       <SettingGroup title="Installed on this device">{summaryRows('installed')}</SettingGroup>
       <details className="tetro-model-disclosure" open={browseSummary} onToggle={event => setBrowseSummary(event.currentTarget.open)}>
         <summary>Browse summary models <span>Download another model for this device</span></summary>
@@ -101,7 +129,7 @@ export function ModelsSettings({ section, onSectionChange }: { section: ModelsSe
       <p>Connect a provider or server for summaries.</p>
       <SettingGroup title="Providers"><ProviderKeys /></SettingGroup>
       <SettingGroup title="Your own server"><OllamaModels /><CustomServer /></SettingGroup>
-      <p className="tetro-setting-note">Keys are stored on this device and sent to the provider to authenticate requests. Using a connected notes model sends transcript text and instructions to that provider, including for automatic meeting names and speaker labels.</p>
+      <p className="tetro-setting-note">Keys are stored on this device and sent to the provider to authenticate requests. Using a connected summary model sends transcript text and instructions to that provider, including for automatic meeting names and speaker labels.</p>
     </div>}
   </div>;
 }
@@ -128,7 +156,7 @@ function ProviderKeys() {
 
 function ProviderKeyRow({ id, name, hint, check }: { id: ProviderId; name: string; hint: string; check?: string }) {
   const { providerApiKeys, updateProviderApiKey } = useConfig();
-  const saved = providerApiKeys[id]?.trim() || '';
+  const saved = providerApiKeys[id];
   const [draft, setDraft] = useState('');
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -141,7 +169,7 @@ function ProviderKeyRow({ id, name, hint, check }: { id: ProviderId; name: strin
       // Where the provider can list models, check before saving. The catalog command must return errors instead of fallback models.
       if (check) await invoke(check, { apiKey: key });
       await invoke('api_save_api_key', { provider: id, apiKey: key });
-      updateProviderApiKey(id, key);
+      updateProviderApiKey(id, true);
       setDraft(''); setEditing(false);
     } catch (e) {
       toast.error(`Couldn’t connect ${name}`, { description: String(e) });
@@ -150,7 +178,7 @@ function ProviderKeyRow({ id, name, hint, check }: { id: ProviderId; name: strin
   const remove = async () => {
     try {
       await invoke('api_delete_api_key', { provider: id });
-      updateProviderApiKey(id, null);
+      updateProviderApiKey(id, false);
     } catch (e) {
       toast.error(`Couldn’t remove the ${name} key`, { description: String(e) });
     }
@@ -160,7 +188,7 @@ function ProviderKeyRow({ id, name, hint, check }: { id: ProviderId; name: strin
   return (
     <SettingRow label={label} hint={hint}>
       {saved && !editing ? <>
-        <code className="tetro-key-mask" aria-label="Saved key">•••• {saved.slice(-4)}</code>
+        <code className="tetro-key-mask" aria-label="Saved key">Saved securely</code>
         <button type="button" className="tetro-key" onClick={() => setEditing(true)}>Replace</button>
         <button type="button" className="tetro-key" onClick={remove}>Remove</button>
       </> : <form className="tetro-key-form" onSubmit={e => { e.preventDefault(); void connect(); }}>
@@ -174,7 +202,7 @@ function ProviderKeyRow({ id, name, hint, check }: { id: ProviderId; name: strin
 
 function ProviderCatalog({ id, name }: { id: SummaryProviderId; name: string }) {
   const { providerApiKeys, modelConfig, setModelConfig } = useConfig();
-  const key = providerApiKeys[id]?.trim();
+  const key = providerApiKeys[id];
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<SourceState>();
   const [search, setSearch] = useState('');
@@ -192,7 +220,7 @@ function ProviderCatalog({ id, name }: { id: SummaryProviderId; name: string }) 
   const choose = async (choice: ModelChoice) => {
     setSaving(choice.model);
     try {
-      const saved = await activateNotesModel({ ...choice.config, provider: id, model: choice.model }, key);
+      const saved = await activateNotesModel({ ...choice.config, provider: id, model: choice.model });
       setModelConfig(saved);
     } catch (error) { toast.error('Couldn’t switch summary models', { description: String(error) }); }
     finally { setSaving(undefined); }

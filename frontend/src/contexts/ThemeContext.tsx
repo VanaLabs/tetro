@@ -7,7 +7,9 @@ export type Theme = "light" | "dark"
 /** What the person chose; "system" follows macOS. */
 export type ThemePreference = Theme | "system"
 
-const THEME_STORAGE_KEY = "meetily-theme"
+const THEME_STORAGE_KEY = "tetro-theme"
+// Earlier builds stored the theme under the inherited Meetily key; read it once so nobody loses their choice.
+const LEGACY_THEME_STORAGE_KEY = "meetily-theme"
 
 interface ThemeContextValue {
   /** Resolved theme currently shown. */
@@ -28,7 +30,7 @@ const resolve = (preference: ThemePreference): Theme =>
 function readStoredPreference(): ThemePreference {
   if (typeof window === "undefined") return "light"
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY) ?? window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY)
     return stored === "dark" || stored === "system" ? stored : "light"
   } catch {
     return document.documentElement.classList.contains("dark") ? "dark" : "light"

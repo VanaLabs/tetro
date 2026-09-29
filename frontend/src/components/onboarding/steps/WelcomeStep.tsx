@@ -1,65 +1,45 @@
 import React from 'react';
 import { TetroBrand } from '@/components/tetro/TetroBrand';
-import { Lock, Sparkles, Cpu } from 'lucide-react';
+import { FileDown, Languages, ListChecks, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OnboardingContainer } from '../OnboardingContainer';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import styles from './WelcomeStep.module.css';
 
-export function WelcomeStep() {
+export function WelcomeStep({ totalSteps }: { totalSteps: number }) {
   const { goNext } = useOnboarding();
 
   const features = [
-    {
-      icon: Lock,
-      title: 'Recordings and notes are stored on your device',
-    },
-    {
-      icon: Sparkles,
-      title: 'Intelligent summaries & insights',
-    },
-    {
-      icon: Cpu,
-      title: 'Local models work offline after setup',
-    },
+    { icon: ShieldCheck, title: 'Privacy first', text: 'Everything runs on local models, so nothing leaves your device. Private enough for therapy sessions.' },
+    { icon: FileDown, title: 'Easy export', text: 'Save transcripts and summaries as PDF or Markdown to share.' },
+    { icon: ListChecks, title: 'Action items in one place', text: 'Action items from your summaries collect in one list you can check off.' },
+    { icon: Languages, title: 'Models for your language', text: 'Choose local models by language, including ones built for Armenian.' },
   ];
 
   return (
     <OnboardingContainer
-      title="Welcome to Tetro"
-      description="Record and transcribe locally. Choose how you make notes."
+      title={
+        <>
+          <span className={styles.greeting}>Welcome to</span>
+          <span className={styles.brandLine}>
+            <TetroBrand variant="welcome" />
+            <span className="sr-only">Tetro</span>
+          </span>
+        </>
+      }
+      description="Record, transcribe and summarize your meetings, privately on your device."
       step={1}
-      hideProgress={true}
+      totalSteps={totalSteps}
+      centered={true}
+      footer={<Button onClick={goNext} className="w-full h-11 tetro-key tetro-key-amber">Get started</Button>}
     >
-      <div className="flex flex-col items-center space-y-10">
-        <TetroBrand variant="welcome" motion={false} />
-
-        {/* Features Card */}
-        <div className="w-full max-w-md bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
-          {features.map((feature, index) => {
-            const Icon = feature.icon;
-            return (
-              <div key={index} className="flex items-start gap-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">
-                    <Icon className="w-3 h-3 text-gray-700" />
-                  </div>
-                </div>
-                <p className="text-sm text-gray-700 leading-relaxed">{feature.title}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* CTA Section */}
-        <div className="w-full max-w-xs space-y-3">
-          <Button
-            onClick={goNext}
-            className="w-full h-11 tetro-key tetro-key-amber"
-          >
-            Get Started
-          </Button>
-          <p className="text-xs text-center text-gray-500">Models only download when you choose them.</p>
-        </div>
+      <div className="tetro-welcome-features">
+        {features.map(({ icon: Icon, title, text }) => (
+          <div key={title} className="tetro-welcome-feature">
+            <span aria-hidden="true"><Icon /></span>
+            <div><strong>{title}</strong><p>{text}</p></div>
+          </div>
+        ))}
       </div>
     </OnboardingContainer>
   );

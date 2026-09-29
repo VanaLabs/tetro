@@ -6,6 +6,7 @@ import PageContent from "./page-content";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { invoke } from "@tauri-apps/api/core";
+import { RECOMMENDED_SUMMARY_MODEL } from "@/lib/recommended-models";
 import { LoaderIcon } from "lucide-react";
 import { useConfig } from "@/contexts/ConfigContext";
 import { usePaginatedTranscripts } from "@/hooks/usePaginatedTranscripts";
@@ -50,17 +51,21 @@ function MeetingDetailsContent() {
     error: transcriptError,
   } = usePaginatedTranscripts({ meetingId: meetingId || '' });
 
-  // Check if gemma3:1b model is available in Ollama
-  const checkForGemmaModel = useCallback(async (): Promise<boolean> => {
+  // First-run fallback when no summary model is saved yet: Qwen 3.5 2B, on this device if it's
+  // downloaded, otherwise through Ollama if it's pulled there.
+  const findRecommendedModel = useCallback(async (): Promise<'builtin-ai' | 'ollama' | null> => {
+    try {
+      if (await invoke<boolean>('builtin_ai_is_model_ready', { modelName: RECOMMENDED_SUMMARY_MODEL, refresh: false })) return 'builtin-ai';
+    } catch (error) {
+      console.error('❌ Failed to check the built-in summary model:', error);
+    }
     try {
       const models = await invoke('get_ollama_models', { endpoint: null }) as any[];
-      const hasGemma = models.some((m: any) => m.name === 'gemma3:1b');
-      console.log('🔍 Checked for gemma3:1b:', hasGemma);
-      return hasGemma;
+      if (models.some((m: any) => m.name === RECOMMENDED_SUMMARY_MODEL)) return 'ollama';
     } catch (error) {
       console.error('❌ Failed to check Ollama models:', error);
-      return false;
     }
+    return null;
   }, []);
 
   // Set up auto-generation - respects DB as source of truth
@@ -93,15 +98,15 @@ function MeetingDetailsContent() {
         return;
       }
 
-      // DB is empty - check if gemma3:1b exists as fallback
-      const hasGemma = await checkForGemmaModel();
+      // DB is empty - fall back to the recommended model if it's available
+      const provider = await findRecommendedModel();
 
-      if (hasGemma) {
-        console.log('💾 DB empty, using gemma3:1b as initial default');
+      if (provider) {
+        console.log(`💾 DB empty, using ${RECOMMENDED_SUMMARY_MODEL} (${provider}) as initial default`);
 
         await invoke('api_save_model_config', {
-          provider: 'ollama',
-          model: 'gemma3:1b',
+          provider,
+          model: RECOMMENDED_SUMMARY_MODEL,
           whisperModel: 'large-v3',
           apiKey: null,
           ollamaEndpoint: null,
@@ -109,14 +114,14 @@ function MeetingDetailsContent() {
 
         setShouldAutoGenerate(true);
       } else {
-        console.log('⚠️ No model configured and gemma3:1b not found');
+        console.log(`⚠️ No model configured and ${RECOMMENDED_SUMMARY_MODEL} not found`);
       }
     } catch (error) {
       console.error('❌ Failed to setup auto-generation:', error);
     }
 
     setHasCheckedAutoGen(true);
-  }, [hasCheckedAutoGen, checkForGemmaModel, source, isAutoSummary]);
+  }, [hasCheckedAutoGen, findRecommendedModel, source, isAutoSummary]);
 
   // Sync meeting metadata from pagination hook to meeting details state
   useEffect(() => {

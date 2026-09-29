@@ -36,7 +36,7 @@ const COMMANDS: CommandOption[] = [
   },
   { 
     id: 'bullet', 
-    label: 'Bullet List', 
+    label: 'Bullet list',
     type: 'bullet', 
     icon: '•', 
     description: 'Create a bulleted list' 

@@ -1,0 +1,26 @@
+{
+  "name": "Ideas & Notes",
+  "description": "Organize a solo recording of thoughts, personal notes, or brainstorming without turning ideas into commitments.",
+  "sections": [
+    {
+      "title": "Overview",
+      "instruction": "Summarize the thoughts or topics the speaker was trying to capture. Keep the speaker's uncertainty and tone without treating this as a meeting or a finished plan.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Ideas & Observations",
+      "instruction": "List the ideas, observations, examples, and possibilities worth remembering. Keep tentative possibilities separate from decisions or commitments.",
+      "format": "list"
+    },
+    {
+      "title": "Open Questions",
+      "instruction": "List questions or tensions the speaker raised and did not resolve. Omit this section if none were raised.",
+      "format": "list"
+    },
+    {
+      "title": "Action Items",
+      "instruction": "List only actions the speaker explicitly decided or committed to take. Do not turn ideas to explore into tasks; omit this section when there is no clear commitment.",
+      "format": "list"
+    }
+  ]
+}

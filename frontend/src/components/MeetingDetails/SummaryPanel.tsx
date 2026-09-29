@@ -22,6 +22,10 @@ import {
   SummaryLanguageStorage,
 } from '@/lib/summary-language-preferences';
 import { hasVisibleSummaryContent } from '@/lib/summary-content';
+import { useRouter } from 'next/navigation';
+import { openSummaryModelChoices } from '@/lib/model-settings-route';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 interface SummaryPanelProps {
   meeting: {
@@ -92,7 +96,24 @@ export function SummaryPanel({
   isModelConfigLoading = false,
   onOpenModelSettings,
 }: SummaryPanelProps) {
+  const router = useRouter();
+  const chooseModel = () => openSummaryModelChoices(href => router.push(href));
   const [summaryLang, setSummaryLang] = useState<string | null>(null);
+  const [hasReadyModel, setHasReadyModel] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      if (!modelConfig.model?.trim()) { if (active) setHasReadyModel(false); return; }
+      if (!['builtin-ai', 'local-llama', 'localllama'].includes(modelConfig.provider)) { if (active) setHasReadyModel(true); return; }
+      const ready = await invoke<boolean>('builtin_ai_is_model_ready', { modelName: modelConfig.model, refresh: false }).catch(() => false);
+      if (active) setHasReadyModel(ready);
+    };
+    void check();
+    const unlisten = listen<{ model: string; status: string }>('builtin-ai-download-progress', event => {
+      if (event.payload.model === modelConfig.model && event.payload.status === 'completed') void check();
+    });
+    return () => { active = false; void unlisten.then(fn => fn()); };
+  }, [modelConfig.provider, modelConfig.model]);
   const [summaryLangStorage, setSummaryLangStorage] = useState<SummaryLanguageStorage>('metadata');
   const [langPickerOpen, setLangPickerOpen] = useState(false);
   const [languageSaving, setLanguageSaving] = useState(false);
@@ -224,14 +245,14 @@ export function SummaryPanel({
   const hasSummary = hasVisibleSummaryContent(aiSummary);
 
   const languageTrigger = useRef<HTMLButtonElement | null>(null);
-  const languageSlot = <button type="button" className="tetro-key" disabled={isSummaryLoading} title={`Notes language: ${effectiveLangLabel}`} aria-label={`Notes language: ${effectiveLangLabel}`} onClick={event => { languageTrigger.current = event.currentTarget; setLangPickerOpen(true); }}><Languages size={14} /><span>{effectiveLangLabel}</span></button>;
+  const languageSlot = <button type="button" className="tetro-key" disabled={isSummaryLoading} title={`Summary language: ${effectiveLangLabel}`} aria-label={`Summary language: ${effectiveLangLabel}`} onClick={event => { languageTrigger.current = event.currentTarget; setLangPickerOpen(true); }}><Languages size={14} /><span>{effectiveLangLabel}</span></button>;
 
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-white overflow-hidden h-full w-full @container">
       <div className="tetro-pane-toolbar">
         <SummaryGeneratorButtonGroup
-          modelConfig={modelConfig} setModelConfig={setModelConfig} onSaveModelConfig={onSaveModelConfig}
-          onGenerateSummary={generateWithSavedLanguage} onStopGeneration={onStopGeneration} customPrompt={customPrompt}
+          modelConfig={modelConfig} hasModel={hasReadyModel} setModelConfig={setModelConfig} onSaveModelConfig={onSaveModelConfig}
+          onGenerateSummary={generateWithSavedLanguage} onChooseModel={chooseModel} onStopGeneration={onStopGeneration} customPrompt={customPrompt}
           languageSaving={languageSaving} languageLabel={effectiveLangLabel}
           summaryStatus={summaryStatus} availableTemplates={availableTemplates} selectedTemplate={selectedTemplate}
           onTemplateSelect={onTemplateSelect} hasTranscripts={transcripts.length > 0} hasSummary={hasSummary}
@@ -242,7 +263,7 @@ export function SummaryPanel({
         />
       </div>
       <Dialog open={langPickerOpen} onOpenChange={setLangPickerOpen}><DialogContent className="tetro-language-dialog" onCloseAutoFocus={event => { event.preventDefault(); languageTrigger.current?.focus(); }}>
-        <DialogTitle>Notes language</DialogTitle><DialogDescription>Choose the language Tetro writes these notes in.</DialogDescription>
+        <DialogTitle>Summary language</DialogTitle><DialogDescription>Choose the language Tetro writes this summary in.</DialogDescription>
         <LanguagePickerPopover value={summaryLang} onChange={handleLangChange} onClose={() => setLangPickerOpen(false)} autoSubtitle={autoSubtitle} />
       </DialogContent></Dialog>
 
@@ -253,7 +274,7 @@ export function SummaryPanel({
           hasTranscript={transcripts.length > 0}
           suggestion={suggestedTemplate && suggestedTemplate.id !== selectedTemplate ? { name: suggestedTemplate.name, onUse: () => onTemplateSelect(suggestedTemplate.id, suggestedTemplate.name) } : null}
           onGenerate={() => generateWithSavedLanguage(customPrompt)}
-          hasModel={modelConfig.provider !== null && modelConfig.model !== null}
+          hasModel={hasReadyModel}
           isGenerating={isSummaryLoading || languageSaving}
           error={summaryError}
         />

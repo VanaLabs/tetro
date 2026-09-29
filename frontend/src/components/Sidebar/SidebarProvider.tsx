@@ -183,13 +183,24 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const baseItems: SidebarItem[] = [
     {
       id: 'meetings',
-      title: 'Meeting Notes',
+      title: 'Meeting summaries',
       type: 'folder' as const,
       children: [
         ...meetings.map(meeting => ({ id: meeting.id, title: meeting.title, type: 'file' as const }))
       ]
     },
   ];
+
+  // Small windows: fold the sidebar away automatically when the window gets narrow,
+  // and bring it back when it widens again. Manual toggles in between still work.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const narrow = window.matchMedia('(max-width: 960px)');
+    const apply = () => setIsCollapsed(narrow.matches);
+    apply();
+    narrow.addEventListener('change', apply);
+    return () => narrow.removeEventListener('change', apply);
+  }, []);
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);

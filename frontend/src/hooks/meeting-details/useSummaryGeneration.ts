@@ -401,7 +401,7 @@ export function useSummaryGeneration({
           endpoint: modelConfig.ollamaEndpoint || null,
         });
         if (models.length === 0) {
-          showPreflightError('No Ollama models found. Please download gemma3:1b from Model Settings.');
+          showPreflightError('No Ollama models found. Please download qwen3.5:2b from Settings → Models.');
           return;
         }
       }

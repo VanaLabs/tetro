@@ -1,5 +1,5 @@
 {
-      "name": "Retrospective (Agile)",
+  "name": "Team Retrospective (Agile)",
       "description": "Sprint retrospective template for continuous improvement.",
       "sections": [
         {
@@ -28,7 +28,7 @@
           "title": "Continue Doing",
           "instruction": "Practices to continue",
           "format": "list",
-          "item_format": "| **Practice** | **Notes** |\n| --- | --- |"
+          "item_format": "| **Practice** | **Details** |\n| --- | --- |"
         },
         {
           "title": "Action Items",
@@ -37,7 +37,7 @@
           "item_format": "| **Owner** | **Task** | **Due Date** | **Success Metric** |\n| --- | --- | --- | --- |"
         },
         {
-          "title": "Notes & Votes",
+          "title": "Observations & Votes",
           "instruction": "Summary and top-voted items",
           "format": "paragraph"
         }

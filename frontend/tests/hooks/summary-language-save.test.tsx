@@ -19,6 +19,9 @@ mock.module('../../src/components/ui/dialog', () => Object.fromEntries(['Dialog'
 mock.module('../../src/hooks/useTemplateSuggestion', () => ({ useTemplateSuggestion: () => null }));
 mock.module('../../src/hooks/useRecentLanguages', () => ({ useRecentLanguages: () => ({ addRecent: () => {} }) }));
 mock.module('sonner', () => ({ toast: { info: () => {}, warning: () => {}, error: () => {} } }));
+mock.module('next/navigation', () => ({ useRouter: () => ({ push: () => {} }) }));
+mock.module('@tauri-apps/api/core', () => ({ invoke: async () => true }));
+mock.module('@tauri-apps/api/event', () => ({ listen: async () => () => {} }));
 const { SummaryPanel } = await import('../../src/components/MeetingDetails/SummaryPanel');
 let view: ReactTestRenderer;
 const generate = mock(async () => {});
@@ -38,7 +41,7 @@ async function show() {
 }
 afterEach(() => { act(() => view.unmount()); saves.length = 0; generate.mockClear(); });
 
-test('writing waits for the chosen language to be saved, including the empty notes action', async () => {
+test('writing waits for the chosen language to be saved, including the empty summary action', async () => {
   await show();
   act(() => choose('en'));
   expect(toolbar.languageSaving).toBe(true);

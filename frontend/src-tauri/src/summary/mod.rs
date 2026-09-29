@@ -16,7 +16,7 @@ pub struct CustomOpenAIConfig {
     /// Base URL of the OpenAI-compatible API endpoint (e.g., "http://localhost:8000/v1")
     pub endpoint: String,
     /// API key for authentication (optional if server doesn't require it)
-    #[serde(rename = "apiKey")]
+    #[serde(rename = "apiKey", skip_serializing)]
     pub api_key: Option<String>,
     /// Model identifier to use (e.g., "gpt-4", "llama-3-70b", "mistral-7b")
     pub model: String,

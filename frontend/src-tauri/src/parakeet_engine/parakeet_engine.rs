@@ -29,6 +29,7 @@ impl Default for QuantizationType {
 pub enum ModelStatus {
     Available,
     Missing,
+    Paused { downloaded_bytes: u64 },
     Downloading { progress: u8 },
     Error(String),
     Corrupted { file_size: u64, expected_min_size: u64 },
@@ -371,6 +372,22 @@ impl ParakeetEngine {
     }
 
     /// Discover available Parakeet models.
+    fn disk_download_status(path: &Path, artifacts: &[ArtifactSpec]) -> ModelStatus {
+        if Self::validate_model_directory(path, artifacts).is_ok() {
+            return ModelStatus::Available;
+        }
+        let sizes: Vec<_> = artifacts.iter().map(|artifact| {
+            (std::fs::metadata(path.join(artifact.filename)).map(|m| m.len()).unwrap_or(0), artifact.exact_bytes)
+        }).collect();
+        let downloaded_bytes = sizes.iter().map(|(size, _)| *size).sum();
+        if downloaded_bytes == 0 { return ModelStatus::Missing; }
+        if sizes.iter().all(|(size, expected)| size <= expected) {
+            ModelStatus::Paused { downloaded_bytes }
+        } else {
+            ModelStatus::Corrupted { file_size: downloaded_bytes, expected_min_size: artifacts.iter().map(|a| a.exact_bytes).sum() }
+        }
+    }
+
     pub async fn discover_models(&self) -> Result<Vec<ModelInfo>> {
         self.discover_models_from_specs(PARAKEET_MODEL_SPECS).await
     }
@@ -383,28 +400,12 @@ impl ParakeetEngine {
 
             for spec in specs {
                 let model_path = self.models_dir.join(spec.name);
-                let status = if model_path.exists() {
-                    match Self::validate_model_directory(&model_path, spec.artifacts) {
-                        Ok(()) => ModelStatus::Available,
-                        Err(error) => {
-                            let file_size = spec
-                                .artifacts
-                                .iter()
-                                .filter_map(|artifact| {
-                                    std::fs::metadata(model_path.join(artifact.filename)).ok()
-                                })
-                                .map(|metadata| metadata.len())
-                                .sum();
-                            validation_errors.push((spec.name, error));
-                            ModelStatus::Corrupted {
-                                file_size,
-                                expected_min_size: spec.exact_bytes(),
-                            }
-                        }
+                let status = Self::disk_download_status(&model_path, spec.artifacts);
+                if let ModelStatus::Corrupted { .. } = status {
+                    if let Err(error) = Self::validate_model_directory(&model_path, spec.artifacts) {
+                        validation_errors.push((spec.name, error));
                     }
-                } else {
-                    ModelStatus::Missing
-                };
+                }
 
                 models.push(ModelInfo {
                     name: spec.name.to_string(),
@@ -538,7 +539,7 @@ impl ParakeetEngine {
                 );
                 Ok(())
             }
-            ModelStatus::Missing => {
+            ModelStatus::Missing | ModelStatus::Paused { .. } => {
                 Err(anyhow!("Parakeet model {} is not downloaded", model_name))
             }
             ModelStatus::Downloading { .. } => {
@@ -615,6 +616,11 @@ impl ParakeetEngine {
     pub async fn delete_model(&self, model_name: &str) -> Result<String> {
         let model_name = canonical_model_name(model_name);
         log::info!("Attempting to delete Parakeet model: {}", model_name);
+        // Serialize removal with download ownership so a resume cannot recreate files mid-delete.
+        let mut active = self.active_downloads.lock().await;
+        if active.downloads.contains_key(model_name) {
+            return Err(anyhow!("Stop the download before removing its files"));
+        }
 
         // Get model info to find the directory path
         let model_info = {
@@ -628,7 +634,7 @@ impl ParakeetEngine {
 
         // Allow deletion of corrupted or available models
         match &model_info.status {
-            ModelStatus::Corrupted { .. } | ModelStatus::Available => {
+            ModelStatus::Corrupted { .. } | ModelStatus::Paused { .. } | ModelStatus::Available => {
                 // Delete the entire model directory
                 if model_info.path.exists() {
                     fs::remove_dir_all(&model_info.path).await
@@ -646,6 +652,7 @@ impl ParakeetEngine {
                     }
                 }
 
+                active.revision = active.revision.wrapping_add(1);
                 Ok(format!("Successfully deleted Parakeet model '{}'", model_name))
             }
             _ => {
@@ -1215,7 +1222,7 @@ impl ParakeetEngine {
         active_downloads.downloads.remove(model_name);
         if let Some(model) = models.get_mut(model_name) {
             if cancellation_won || result.is_err() {
-                model.status = ModelStatus::Missing;
+                model.status = Self::disk_download_status(model_dir, artifacts);
             } else {
                 model.status = ModelStatus::Available;
                 model.path = model_dir.to_path_buf();
@@ -1418,6 +1425,19 @@ mod tests {
             .expect("test model remains registered")
             .status
             .clone()
+    }
+
+    #[tokio::test]
+    async fn retained_download_is_discoverable_and_removable_after_restart() {
+        let (_temp, engine, path) = test_engine().await;
+        fs::create_dir_all(&path).await.unwrap();
+        fs::write(path.join(SMALL_ARTIFACTS[0].filename), [0; 2]).await.unwrap();
+        let discovered = engine.discover_models_from_specs(SMALL_MODEL_SPECS).await.unwrap();
+        assert!(matches!(discovered[0].status, ModelStatus::Paused { downloaded_bytes: 2 }));
+        engine.delete_model(TEST_MODEL_NAME).await.unwrap();
+        assert!(!path.exists());
+        let discovered = engine.discover_models_from_specs(SMALL_MODEL_SPECS).await.unwrap();
+        assert!(matches!(discovered[0].status, ModelStatus::Missing));
     }
 
     #[tokio::test]
@@ -1670,7 +1690,7 @@ mod tests {
 
         assert!(is_download_cancelled(&error));
         assert_eq!(fs::metadata(model_dir.join("near.bin")).await.unwrap().len(), 99);
-        assert!(matches!(test_model_status(&engine).await, ModelStatus::Missing));
+        assert!(matches!(test_model_status(&engine).await, ModelStatus::Paused { downloaded_bytes: 99 }));
 
         let (base_url, server) = serve_requests(vec![response(
             "near.bin",
@@ -1979,7 +1999,7 @@ mod tests {
         server.await.expect("join cancellation server");
         assert!(is_download_cancelled(&error));
         assert!(std::iter::from_fn(|| events.pop()).all(|progress| progress.percent < 100));
-        assert!(matches!(test_model_status(&engine).await, ModelStatus::Missing));
+        assert!(matches!(test_model_status(&engine).await, ModelStatus::Available));
         assert!(!engine.active_downloads.lock().await.downloads.contains_key(TEST_MODEL_NAME));
     }
 

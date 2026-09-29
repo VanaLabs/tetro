@@ -54,7 +54,7 @@ pub async fn api_preview_meeting_version(state: tauri::State<'_, AppState>, meet
         return Ok(value["transcripts"].as_array().map(|lines| lines.iter().filter_map(|l| l["text"].as_str()).collect::<Vec<_>>().join("\n\n")).unwrap_or_default());
     }
     let summary: Value = serde_json::from_str(value["summary"].as_str().unwrap_or("{}")).unwrap_or(json!({}));
-    Ok(summary["markdown"].as_str().unwrap_or("No notes in this version.").to_string())
+    Ok(summary["markdown"].as_str().unwrap_or("No summary in this version.").to_string())
 }
 
 pub async fn remember_line(tx: &mut Transaction<'_, Sqlite>, meeting: &str, id: &str, original: &str, replacement: &str) -> Result<(), sqlx::Error> {
@@ -200,12 +200,12 @@ pub async fn save_manual_summary(pool: &SqlitePool, meeting: &str, summary: &Val
     let mut tx = pool.begin().await?;
     let previous: Option<String> = sqlx::query_scalar("SELECT result FROM summary_processes WHERE meeting_id=?").bind(meeting).fetch_optional(&mut *tx).await?.flatten();
     let Some(previous) = previous else { return Ok(false) };
-    snapshot(&mut tx, meeting, "summary", "Before editing notes").await?;
+    snapshot(&mut tx, meeting, "summary", "Before editing summary").await?;
     let old: Value = serde_json::from_str(&previous).unwrap_or(json!({}));
     // The editor supplies both markdown and rich blocks. Refuse an ambiguous save
     // rather than silently lose protection for manually edited text.
     let after = markdown_of(summary);
-    if after.trim().is_empty() { return Err(sqlx::Error::Protocol("Could not read the edited notes. Please try saving again.".into())); }
+    if after.trim().is_empty() { return Err(sqlx::Error::Protocol("Could not read the edited summary. Please try saving again.".into())); }
     let mut summary = summary.clone(); summary["markdown"] = json!(after);
     remember_summary(&mut tx, meeting, &markdown_of(&old), &after).await?;
     sqlx::query("UPDATE summary_processes SET result=?,result_backup=CASE WHEN LOWER(status)='pending' THEN ? ELSE result_backup END,updated_at=? WHERE meeting_id=?")

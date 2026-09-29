@@ -34,7 +34,7 @@ export function useMeetingData({ meeting, summaryData, onMeetingUpdated }: UseMe
       try {
         const response = await invokeTauri<{ data: unknown }>('api_get_summary', { meetingId: meeting.id });
         if (!cancelled) setAiSummary(parseSummaryContent(response.data));
-      } catch (e) { toast.error('Could not refresh the notes', { description: String(e) }); }
+      } catch (e) { toast.error('Could not refresh the summary', { description: String(e) }); }
     };
     window.addEventListener(TEXT_UPDATED, update);
     return () => { cancelled = true; window.removeEventListener(TEXT_UPDATED, update); };

@@ -34,6 +34,12 @@ impl DatabaseManager {
 
         sqlx::migrate!("./migrations").run(&pool).await?;
 
+        // Keep local recordings usable if the keychain is locked. Provider-key operations retry
+        // migration and return an error; they never fall back to using plaintext credentials.
+        if let Err(error) = crate::credentials::migrate_legacy(&pool).await {
+            log::warn!("Provider credential migration needs attention: {}", error);
+        }
+
         Ok(DatabaseManager { pool })
     }
 

@@ -60,7 +60,7 @@ html,body { height:100%; overflow:hidden; }
    Soft rounded hardware keys: a visible lower edge, a 1px press, latched keys stay in with an LED. */
 /* body prefix = specificity (0,0,1): beats Tailwind's button reset, loses to explicit utilities */
 body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.tetro-dialog-actions button,.tetro-dialog-form button,
-.tetro-split-toggle,.tetro-selector [role=tab],.tetro-settings [role=tablist] [role=tab],
+.tetro-split-toggle,.tetro-selector [role=tab],
 .tetro-settings button.border:not([role=switch]):not([role=tab]):not(.border-dashed)) {
   display:inline-flex; align-items:center; justify-content:center; gap:6px; position:relative;
   height:30px!important; padding:0 11px; font-size:12.5px!important; font-weight:500; white-space:nowrap;
@@ -69,14 +69,14 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
   box-shadow:0 2px 0 var(--tetro-key-drop),var(--tetro-key-hi)!important;
   transform:translateY(0); transition:transform 70ms ease-out,box-shadow 70ms ease-out,background-color 70ms ease-out; margin-bottom:2px;
 }
-:where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.tetro-dialog-actions button,.tetro-dialog-form button,.tetro-split-toggle,.tetro-selector [role=tab],.tetro-settings [role=tablist] [role=tab],.tetro-settings button.border:not([role=switch]):not([role=tab]):not(.border-dashed)):hover:not(:disabled) { border-color:var(--tetro-faint)!important; border-bottom-color:var(--tetro-key-drop)!important; }
-:where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.tetro-dialog-actions button,.tetro-dialog-form button,.tetro-split-toggle,.tetro-selector [role=tab],.tetro-settings [role=tablist] [role=tab],.tetro-settings button.border:not([role=switch]):not([role=tab]):not(.border-dashed)):active:not(:disabled),
-:where(.tetro-key[data-latched],.tetro-split-toggle[aria-pressed=true],.tetro-selector [role=tab][aria-selected=true],.tetro-settings [role=tablist] [role=tab][data-state=active]) {
+:where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.tetro-dialog-actions button,.tetro-dialog-form button,.tetro-split-toggle,.tetro-selector [role=tab],.tetro-settings button.border:not([role=switch]):not([role=tab]):not(.border-dashed)):hover:not(:disabled) { border-color:var(--tetro-faint)!important; border-bottom-color:var(--tetro-key-drop)!important; }
+:where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.tetro-dialog-actions button,.tetro-dialog-form button,.tetro-split-toggle,.tetro-selector [role=tab],.tetro-settings button.border:not([role=switch]):not([role=tab]):not(.border-dashed)):active:not(:disabled),
+:where(.tetro-key[data-latched],.tetro-split-toggle[aria-pressed=true],.tetro-selector [role=tab][aria-selected=true]) {
   transform:translateY(2px); background:var(--tetro-key-pressed)!important; box-shadow:var(--tetro-key-inset)!important; border-color:var(--tetro-key-drop)!important;
 }
 /* LED on latched keys; leave room so it never touches the label */
-:where(.tetro-split-toggle[aria-pressed=true],.tetro-selector [role=tab][aria-selected=true],.tetro-settings [role=tablist] [role=tab][data-state=active]) { padding-right:15px!important; }
-.tetro-key[data-latched]::after,.tetro-split-toggle[aria-pressed=true]::after,.tetro-selector [role=tab][aria-selected=true]::after,.tetro-settings [role=tablist] [role=tab][data-state=active]::after {
+:where(.tetro-split-toggle[aria-pressed=true],.tetro-selector [role=tab][aria-selected=true]) { padding-right:15px!important; }
+.tetro-key[data-latched]::after,.tetro-split-toggle[aria-pressed=true]::after,.tetro-selector [role=tab][aria-selected=true]::after {
   content:''; position:absolute; top:4px; right:5px; width:4px; height:4px; border-radius:50%; background:var(--tetro-accent); box-shadow:0 0 4px var(--tetro-accent);
 }
 :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.tetro-dialog-actions button,.tetro-dialog-form button):disabled { opacity:.45; }
@@ -90,7 +90,7 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 .tetro-app :is(.tetro-primary,.tetro-danger,.tetro-key-amber,.tetro-pane-toolbar button.bg-primary):active:not(:disabled) { transform:translateY(2px); box-shadow:inset 0 2px 3px rgba(0,0,0,.25)!important; }
 
 /* Key clusters */
-.tetro-pane-toolbar [role=group],.tetro-selector,.tetro-keybank,.tetro-settings [role=tablist] {
+.tetro-pane-toolbar [role=group],.tetro-selector,.tetro-keybank {
   display:inline-flex!important; align-items:center; gap:3px; padding:3px; border-radius:10px; background:var(--tetro-panel)!important; box-shadow:inset 0 0 0 1px var(--tetro-line)!important;
 }
 .tetro-pane-toolbar [role=group]>* { border-radius:7px!important; margin-left:0!important; }
@@ -225,7 +225,11 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 .tetro-pane-toolbar button { padding-left:8px!important; padding-right:8px!important; }
 .tetro-pane-toolbar [role=group] { gap:2px; }
 .tetro-pane-toolbar .tetro-template-select { display:inline-flex; align-items:center; max-width:150px; min-width:0; flex-shrink:1; height:30px; gap:4px; border-radius:7px; padding:0 8px; background:var(--tetro-panel); box-shadow:inset 0 0 0 1px var(--tetro-line); border:0; }
-.tetro-template-select select { width:100%; min-width:0; background:transparent; font-size:12px; }
+.tetro-template-select > span { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; text-align:left; font-size:12px; }
+.tetro-template-select > svg { flex-shrink:0; }
+.tetro-template-options { background:var(--tetro-paper); color:var(--tetro-ink); border-color:var(--tetro-line); max-width:min(340px, calc(100vw - 24px)); }
+.tetro-template-options [role=option] { white-space:normal; cursor:pointer; }
+.tetro-template-options [role=option][data-highlighted] { background:var(--tetro-panel); color:var(--tetro-ink); }
 
 /* ——— Transcript ——— */
 .tetro-transcript-scroll { padding:4px 24px 24px 18px!important; }
@@ -353,13 +357,33 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 /* ——— Settings ——— */
 .tetro-settings>div:first-child { display:none; }
 .tetro-settings>div:last-child { padding:0 16px 16px; }
-.tetro-settings>div:last-child>div { max-width:860px; margin:0 auto; padding:0 0 40px!important; background:var(--tetro-paper); border-radius:12px; box-shadow:var(--tetro-shadow); animation:tetro-sheet .35s var(--tetro-ease) both; }
-.tetro-settings>div:last-child>div { padding-top:14px!important; }
-.tetro-settings>div:last-child>div>* { margin-left:32px; margin-right:32px; }
-.tetro-settings [role=tablist] { width:auto!important; height:auto!important; border:0!important; overflow-x:auto; margin-top:6px; margin-bottom:10px; }
-.tetro-settings [role=tablist]>div:not([role=tab]) { display:none!important; }
-.tetro-settings [role=tablist] [role=tab] { height:28px!important; padding:0 11px!important; }
-.tetro-settings [role=tablist] [role=tab] svg { width:14px; height:14px; }
+.tetro-settings-sheet { max-width:1040px; margin:0 auto; background:var(--tetro-paper); border-radius:12px; box-shadow:var(--tetro-shadow); animation:tetro-sheet .35s var(--tetro-ease) both; container:tetro-settings / inline-size; }
+/* Sections on the left, one section on the right — the System Settings pattern. */
+.tetro-settings-layout { display:grid; grid-template-columns:232px minmax(0,1fr); align-items:start; }
+.tetro-settings .tetro-settings-nav { position:sticky; top:0; display:flex!important; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:2px; height:auto!important; padding:14px 10px 16px!important; background:transparent!important; border-radius:0; color:var(--tetro-ink); }
+.tetro-settings-nav [role=tab] { position:relative; display:flex!important; align-items:flex-start; justify-content:flex-start; gap:10px; padding:8px 10px 8px 12px!important; border-radius:8px!important; white-space:normal; text-align:left; color:var(--tetro-ink)!important; background:transparent!important; box-shadow:none!important; transition:background-color 120ms ease; }
+.tetro-settings-nav [role=tab]:hover { background:var(--tetro-selected)!important; }
+.tetro-settings-nav [role=tab][data-state=active] { background:var(--tetro-selected)!important; box-shadow:inset 0 0 0 1px var(--tetro-line)!important; }
+.tetro-settings-nav [role=tab][data-state=active]::before { content:''; position:absolute; left:3px; top:10px; bottom:10px; width:3px; border-radius:2px; background:var(--tetro-accent); }
+.tetro-settings-nav [role=tab]:focus-visible { outline:2px solid var(--tetro-accent); outline-offset:1px; }
+.tetro-settings-nav [role=tab] svg { flex-shrink:0; width:16px; height:16px; margin-top:1px; color:var(--tetro-muted); }
+.tetro-settings-nav [role=tab][data-state=active] svg { color:var(--tetro-accent); }
+.tetro-settings-nav [role=tab]>span { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.tetro-settings-nav strong { font-size:13.5px; font-weight:550; line-height:1.25; }
+.tetro-settings-nav small { font-size:11.5px; font-weight:400; line-height:1.35; color:var(--tetro-muted); }
+.tetro-settings-nav .is-apart { margin-top:17px; }
+.tetro-settings-nav .is-apart::after { content:''; position:absolute; left:10px; right:10px; top:-9px; border-top:1px solid var(--tetro-line); }
+.tetro-settings-panel { min-width:0; min-height:100%; padding:22px 32px 40px; border-left:1px solid var(--tetro-line); }
+.tetro-settings-panel-head h2 { font-size:20px!important; font-weight:600; letter-spacing:-.01em; color:var(--tetro-ink); }
+.tetro-settings-panel-head p { margin-top:2px; font-size:12.5px; color:var(--tetro-muted); }
+@container tetro-settings (max-width:760px) {
+  .tetro-settings-layout { grid-template-columns:1fr; }
+  .tetro-settings .tetro-settings-nav { position:static; flex-direction:row; flex-wrap:wrap; gap:4px; padding:12px 16px 10px!important; border-bottom:1px solid var(--tetro-line); }
+  .tetro-settings-nav [role=tab] { align-items:center; padding:6px 10px!important; }
+  .tetro-settings-nav small,.tetro-settings-nav .is-apart::after,.tetro-settings-nav [role=tab][data-state=active]::before { display:none; }
+  .tetro-settings-nav .is-apart { margin-top:0; }
+  .tetro-settings-panel { border-left:0; padding:18px 20px 32px; }
+}
 .tetro-settings [role=tabpanel] { margin-top:0!important; }
 .tetro-settings [role=tabpanel]>div>:first-child { padding-top:10px!important; }
 .tetro-settings [role=tabpanel] { animation:tetro-enter .25s var(--tetro-ease) both; }
@@ -391,13 +415,19 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 .tetro-template-columns { display:flex; min-height:0; flex:1; gap:12px; padding:0 16px 16px; }
 .tetro-template-columns :is(nav,article) { background:var(--tetro-paper); border-radius:12px; box-shadow:var(--tetro-shadow); animation:tetro-sheet .35s var(--tetro-ease) both; overflow:auto; }
 .tetro-template-columns nav { width:36%; padding:8px; }
-.tetro-template-columns nav button { display:flex; text-align:left; gap:10px; padding:10px; width:100%; border-radius:8px; transition:background .15s; }
+.tetro-template-columns nav .tetro-template-group-label { margin:12px 10px 5px; color:var(--tetro-faint); font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
+.tetro-template-columns nav button { display:flex; align-items:flex-start; text-align:left; gap:11px; padding:10px; width:100%; border-radius:8px; transition:background .15s; }
 .tetro-template-columns nav button:hover { background:var(--tetro-selected); }
-.tetro-template-columns nav svg { width:16px; height:16px; margin-top:2px; color:var(--tetro-faint); }
+.tetro-template-columns nav button:focus-visible { outline:2px solid var(--tetro-accent); outline-offset:2px; }
+.tetro-template-columns nav .tetro-template-icon { display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px; border:1px solid var(--tetro-line); border-radius:8px; background:var(--tetro-panel); color:var(--tetro-muted); transition:color .15s,border-color .15s,background .15s; }
+.tetro-template-columns nav .tetro-template-icon svg { width:18px; height:18px; }
+.tetro-template-columns nav button:hover .tetro-template-icon { color:var(--tetro-ink); border-color:var(--tetro-line-strong); }
 .tetro-template-columns nav strong { font-weight:500; }
 .tetro-template-columns nav small { display:block; color:var(--tetro-muted); font-size:11.5px; margin-top:3px; line-height:1.5; }
 .tetro-template-columns .selected { background:var(--tetro-selected); }
-.tetro-template-columns .selected svg { color:var(--tetro-accent); }
+.tetro-template-columns nav .selected .tetro-template-icon { color:var(--tetro-accent); border-color:var(--tetro-line-strong); background:var(--tetro-paper); }
+.tetro-template-columns nav .tetro-template-icon-custom,
+.tetro-template-columns nav .selected .tetro-template-icon-custom { color:var(--tetro-teal-ui); border-color:color-mix(in srgb,var(--tetro-teal-ui) 35%,var(--tetro-line)); background:color-mix(in srgb,var(--tetro-teal-ui) 9%,var(--tetro-panel)); }
 .tetro-template-columns article { flex:1; padding:22px 28px 24px; animation-delay:.05s; }
 .tetro-template-columns h2 { font-size:20px; font-weight:600; letter-spacing:-.01em; margin-bottom:8px; }
 .tetro-template-columns h3 { font-family:var(--font-tetro-mono),monospace; font-size:10.5px; font-weight:400; color:var(--tetro-faint); margin:22px 0 8px; }
@@ -408,6 +438,9 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 .tetro-about h2 { font-size:18px; font-weight:600; }
 .tetro-about>.tetro-format { justify-self:start; }
 .tetro-about-body { flex:1; min-height:0; overflow-y:auto; scrollbar-gutter:stable; padding-right:8px; }
+.tetro-about-description { max-width:48ch; margin:4px 0 10px; }
+.tetro-about-note { color:var(--tetro-muted); }
+.tetro-about-actions { margin-top:28px; padding-bottom:8px; justify-content:flex-start; flex-wrap:wrap; gap:10px; }
 .tetro-about-head { display:flex; align-items:center; gap:14px; }
 .tetro-about-head p { color:var(--tetro-muted); font-size:12.5px; }
 .tetro-privacy { display:grid; gap:10px; }
@@ -810,7 +843,7 @@ button.tetro-stamp:hover { color:var(--tetro-accent); }
 
 /* ——— Models: compact rows ——— */
 .tetro-model-rows { display:flex; flex-direction:column; }
-.tetro-model-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto 150px; align-items:center; gap:12px; min-height:52px; padding:8px 0; border-bottom:1px solid var(--tetro-line); }
+.tetro-model-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto 166px; align-items:center; gap:8px; min-height:46px; padding:6px 0; border-bottom:1px solid var(--tetro-line); }
 .tetro-model-rows--nested .tetro-model-row { grid-template-columns:minmax(0,1fr) auto 150px; padding-left:12px; min-height:40px; }
 .tetro-model-row-reel { width:24px; height:24px; }
 .tetro-model-row:not([data-ready]) .tetro-model-row-reel { opacity:.55; }
@@ -818,9 +851,13 @@ button.tetro-stamp:hover { color:var(--tetro-accent); }
 .tetro-model-row-name { display:flex; align-items:center; gap:0; font-size:13.5px; font-weight:500; color:var(--tetro-ink); }
 .tetro-model-row-name .tetro-recommended { margin-left:8px; }
 .tetro-model-row-note { font-size:12px; color:var(--tetro-muted); line-height:1.5; overflow-wrap:anywhere; }
-.tetro-model-row .tetro-model-specs { margin:0; flex-wrap:nowrap; }
-.tetro-model-row-action { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-.tetro-model-row-action .tetro-key { height:28px; padding:0 12px; font-size:12.5px; }
+.tetro-model-row .tetro-model-specs { margin:0; flex-wrap:nowrap; gap:6px 10px; font-size:11px; }
+.tetro-model-row-action { display:flex; align-items:center; justify-content:flex-end; gap:5px; white-space:nowrap; }
+.tetro-model-row-action .tetro-key { height:28px; padding:0 9px; font-size:12px; }
+.tetro-model-saved { flex-shrink:0; font-size:11px; color:var(--tetro-muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+.tetro-model-small-action { height:28px; padding:0 10px; border:1px solid var(--tetro-line-strong); border-radius:7px; background:var(--tetro-paper); color:var(--tetro-ink); font-size:12.5px; }
+.tetro-model-small-action:hover { background:var(--tetro-selected); }
+.tetro-model-small-action:focus-visible { outline:2px solid var(--tetro-accent); outline-offset:2px; }
 .tetro-model-progress { width:70px; height:4px; border-radius:2px; background:var(--tetro-led-off); overflow:hidden; }
 .tetro-model-progress i { display:block; height:100%; background:var(--tetro-accent); transition:width .3s; }
 .tetro-model-pct { font-family:var(--font-tetro-mono),monospace; font-size:11px; color:var(--tetro-muted); min-width:3ch; text-align:right; }
@@ -942,7 +979,7 @@ button.tetro-stamp:hover { color:var(--tetro-accent); }
 .tetro-delete-options small { display: block; opacity: .7; margin-top: 12px; }
 
 .tetro-license-text { padding:16px; background:var(--tetro-paper); border:1px solid var(--tetro-line); border-radius:8px; }
-.tetro-license-text pre { white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.65 var(--font-tetro-mono),monospace; }
+.tetro-license-text pre { white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.7 var(--font-tetro),sans-serif; }
 .tetro-language-chooser { display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; padding:8px 10px; border:1px solid var(--tetro-line); border-radius:6px; background:var(--tetro-paper); color:var(--tetro-ink); font-size:13px; text-align:left; }
 .tetro-language-chooser:disabled { opacity:.5; }
 .tetro-help { flex:none; width:100%; max-width:960px; margin:0 auto; padding:12px 28px 32px; container-type:inline-size; }
@@ -951,25 +988,11 @@ button.tetro-stamp:hover { color:var(--tetro-accent); }
 .tetro-help-tabs button { flex:1 0 auto; min-height:30px; padding:4px 8px; border:0; border-radius:6px; color:var(--tetro-muted); font-size:11.5px; font-weight:500; white-space:nowrap; }
 .tetro-help-tabs button:hover { color:var(--tetro-ink); background:var(--tetro-selected); }
 .tetro-help-tabs button[aria-selected='true'] { background:var(--tetro-paper); color:var(--tetro-ink); box-shadow:0 1px 2px rgba(0,0,0,.09),inset 0 0 0 1px var(--tetro-line-strong); }
-.tetro-guide { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(230px,.8fr); align-content:start; align-items:start; border:1px solid var(--tetro-line); border-radius:12px; overflow:hidden; background:var(--tetro-paper); }
-.tetro-guide-visual { grid-column:1; grid-row:2 / 5; min-width:0; border-right:1px solid var(--tetro-line); }
-.tetro-guide-image { width:100%; position:relative; overflow:hidden; aspect-ratio:110 / 69; background:var(--tetro-desk); }
-.tetro-guide-frame { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; opacity:0; transition:opacity .35s ease-in-out; }
-.tetro-guide-frame.is-visible { opacity:1; }
-.tetro-guide-image>p,.tetro-guide-viewer-image>p { position:absolute; inset:0; display:grid; place-items:center; padding:20px; color:var(--tetro-muted); background:var(--tetro-panel); }
-.tetro-guide-image-controls { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:10px 12px; border-top:1px solid var(--tetro-line); }
-.tetro-guide-image-controls>span { flex:1; min-width:120px; color:var(--tetro-muted); font-size:11px; }
-.tetro-guide-image-controls svg { display:inline; width:13px; height:13px; margin-right:5px; }
-.tetro-guide-viewer { display:flex; flex-direction:column; gap:6px; width:min(1100px,calc(100vw - 32px)); max-width:none; height:min(760px,calc(100dvh - 32px)); max-height:none; overflow:hidden; }
-.tetro-guide-viewer>p { color:var(--tetro-muted); }
-.tetro-guide-viewer-image { flex:1; min-height:0; position:relative; overflow:hidden; background:var(--tetro-desk); }
-.tetro-guide-viewer-controls { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-top:4px; color:var(--tetro-muted); font-size:12px; }
-.tetro-guide-caption { grid-column:2; display:flex; flex-direction:column; gap:10px; align-items:flex-start; min-height:76px; padding:20px 20px 12px; font-size:13px; }
+.tetro-guide { display:flex; flex-direction:column; border:1px solid var(--tetro-line); border-radius:12px; overflow:hidden; background:var(--tetro-paper); }
+.tetro-guide-caption { display:flex; flex-direction:column; gap:8px; align-items:flex-start; min-height:118px; padding:20px; font-size:13px; line-height:1.6; }
 .tetro-guide-step { white-space:nowrap; color:var(--tetro-muted); font:11px var(--font-tetro-mono); }
-.tetro-guide-controls { grid-column:2; display:flex; gap:8px; padding:0 20px 18px; align-items:center; flex-wrap:wrap; }
-.tetro-guide-controls svg { width:13px; height:13px; margin-right:5px; }
+.tetro-guide-controls { display:flex; gap:8px; padding:0 20px 18px; align-items:center; flex-wrap:wrap; }
 .tetro-help-more { margin-top:20px; }.tetro-help-more details { padding:14px 0; border-bottom:1px solid var(--tetro-line); font-size:13px; }.tetro-help-more summary { cursor:pointer; }.tetro-help-more p { color:var(--tetro-muted); margin:12px 0; max-width:72ch; line-height:1.65; }
-@media(prefers-reduced-motion:reduce) { .tetro-guide-frame { transition:none!important; } }
 .tetro-startup { max-width:620px; margin:12vh auto; padding:28px; font-size:14px; line-height:1.7; }.tetro-startup h1 { font-size:24px; margin-bottom:12px; }.tetro-startup details { margin-top:24px; }.tetro-startup pre { font-size:11px; white-space:pre-wrap; overflow-wrap:anywhere; }
 
 
@@ -998,8 +1021,7 @@ body.tetro-printing .tetro-print-controls button { border:1px solid #bbb; paddin
 .tetro-chooser-status p { display:flex; align-items:center; gap:6px; margin:8px 0; }
 .tetro-chooser-status [role=alert] { display:block; color:var(--tetro-red); }
 .tetro-chooser-message { font-size:13px; padding:8px 12px; margin:0; }
-.tetro-chooser-more { display:block; padding:12px; width:100%; text-align:left; font-size:13px; border-top:1px solid var(--tetro-line); color:var(--tetro-accent-ink); }
-.tetro-chooser-more:hover { background:var(--tetro-selected); }
+.tetro-chooser-more { display:flex; justify-content:center; gap:8px; min-height:44px; margin-top:12px; padding:12px 16px; width:100%; font-size:14px; font-weight:600; }
 .tetro-model-disclosure { border-top:1px solid var(--tetro-line); padding-top:16px; }
 .tetro-model-disclosure>summary { cursor:pointer; font-size:14px; font-weight:550; color:var(--tetro-ink); }
 .tetro-model-disclosure>summary span { font-weight:400; color:var(--tetro-muted); font-size:12px; margin-left:12px; }
@@ -1039,21 +1061,114 @@ body.tetro-printing .tetro-print-controls button { border:1px solid #bbb; paddin
 .tetro-language-dialog [cmdk-list] { max-height:min(280px,40vh); }
 .tetro-language-dialog { max-height:90vh; overflow-y:auto; }
 
-.tetro-guide-heading { grid-column:1 / -1; padding:16px 20px; border-bottom:1px solid var(--tetro-line); }
+.tetro-guide-heading { padding:16px 20px; border-bottom:1px solid var(--tetro-line); }
 .tetro-guide-heading h2 { font-size:17px; font-weight:600; margin-bottom:4px; }
 .tetro-guide-heading p { font-size:13px; line-height:1.55; color:var(--tetro-muted); }
-.tetro-guide-caption { align-items:flex-start; line-height:1.6; }
 .tetro-guide-caption h3 { font-weight:600; margin-bottom:3px; }
-.tetro-guide-outline { grid-column:2; padding:0 20px 18px; font-size:13px; line-height:1.65; }
+.tetro-guide-outline { padding:12px 20px 18px; border-top:1px solid var(--tetro-line); font-size:13px; line-height:1.65; }
 .tetro-guide-outline[open] { max-height:220px; overflow-y:auto; }
 @container(max-width:650px) {
-  .tetro-guide { display:flex; flex-direction:column; }
-  .tetro-guide-heading,.tetro-guide-visual,.tetro-guide-caption,.tetro-guide-controls,.tetro-guide-outline { width:100%; }
-  .tetro-guide-caption { order:1; padding:14px 16px 10px; }
-  .tetro-guide-controls { order:2; padding:0 16px 14px; }
-  .tetro-guide-visual { order:3; border-right:0; border-top:1px solid var(--tetro-line); }
-  .tetro-guide-outline { order:4; padding:12px 16px; }
+  .tetro-guide-heading,.tetro-guide-caption,.tetro-guide-controls,.tetro-guide-outline { width:100%; }
+  .tetro-guide-caption { padding:14px 16px 10px; }
+  .tetro-guide-controls { padding:0 16px 14px; }
+  .tetro-guide-outline { padding:12px 16px; }
 }
 .tetro-guide-outline summary { cursor:pointer; color:var(--tetro-muted); }
 .tetro-guide-outline li { margin-top:14px; max-width:80ch; }
 .tetro-guide-outline p { margin-top:3px; color:var(--tetro-muted); }
+
+/* Permissions share the existing settings rows and keyboard-style controls. */
+.tetro-permissions-intro { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.tetro-permissions-intro p { color:var(--tetro-muted); font-size:13px; }
+.tetro-permission-status { display:block; margin-top:3px; color:var(--tetro-ink); font-size:12px; font-weight:400; }
+.tetro-permission-error { color:var(--tetro-ink); font-size:13px; }
+.tetro-permissions .tetro-setting-control { flex-wrap:wrap; justify-content:flex-end; }
+.tetro-permissions { container-type:inline-size; container-name:tetro-permissions; }
+@container tetro-permissions (max-width:620px) { .tetro-permissions-intro,.tetro-permissions .tetro-setting-row { align-items:flex-start; flex-direction:column; } .tetro-permissions .tetro-setting-control { justify-content:flex-start; } }
+
+/* Narrow settings panel: specs drop under the model name instead of squeezing it. */
+.tetro-settings-panel { container:tetro-settings-panel / inline-size; }
+@container tetro-settings-panel (max-width:700px) {
+  .tetro-model-row { grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"reel text action" ". specs specs"; row-gap:4px; }
+  .tetro-model-row-reel { grid-area:reel; } .tetro-model-row-text { grid-area:text; } .tetro-model-row-action { grid-area:action; }
+  .tetro-model-row .tetro-model-specs { grid-area:specs; flex-wrap:wrap; }
+}
+
+/* ——— Polish pass (2026-09-28) ——— */
+/* One page gutter: page titles, toolbars and cards share the same 16px left edge. */
+.tetro-app { --tetro-gutter:16px; }
+.tetro-header { padding-left:calc(var(--tetro-gutter) + 8px); }
+.tetro-desk { padding:0 var(--tetro-gutter) var(--tetro-gutter); }
+.tetro-page-toolbar { padding:4px var(--tetro-gutter) 12px; }
+.tetro-page-toolbar>span:first-child { padding-left:8px; }
+.tetro-template-columns { padding:0 var(--tetro-gutter) var(--tetro-gutter); }
+.tetro-settings>div:last-child { flex:1; min-height:0; display:flex; flex-direction:column; padding:0 var(--tetro-gutter) var(--tetro-gutter); }
+.tetro-settings-sheet { flex:1; width:100%; max-width:none; margin:0; }
+.tetro-settings-layout { min-height:100%; }
+.tetro-help { max-width:none; margin:0; padding:4px var(--tetro-gutter) 32px; }
+.tetro-help>* { max-width:1000px; }
+.tetro-help-intro { padding-left:8px; }
+
+/* Live transcript empty state: centred, on-brand pulse. */
+.tetro-listening { display:flex; flex-direction:column; align-items:center; }
+.tetro-listening-dot { width:10px; height:10px; margin-bottom:14px; border-radius:50%; background:var(--tetro-accent); box-shadow:0 0 0 0 color-mix(in srgb,var(--tetro-accent) 45%,transparent); animation:tetro-listen 1.6s ease-out infinite; }
+.tetro-listening[data-paused] .tetro-listening-dot { animation:none; background:var(--tetro-faint); }
+@keyframes tetro-listen { 0% { box-shadow:0 0 0 0 color-mix(in srgb,var(--tetro-accent) 45%,transparent); } 100% { box-shadow:0 0 0 12px transparent; } }
+@media (prefers-reduced-motion:reduce) { .tetro-listening-dot { animation:none; } }
+
+/* Disabled primary buttons read as neutral, not washed-out orange. */
+body.tetro-app button:is(.tetro-key-amber,.tetro-primary):disabled { background:var(--tetro-panel)!important; color:var(--tetro-faint)!important; border-color:var(--tetro-line-strong)!important; border-bottom-color:var(--tetro-line-strong)!important; box-shadow:none!important; opacity:1!important; }
+
+/* Native controls in the app's style. */
+.tetro-app select { appearance:none; -webkit-appearance:none; height:32px; padding:0 30px 0 10px!important; border:1px solid var(--tetro-line-strong)!important; border-radius:7px!important; background:var(--tetro-paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 10px center!important; color:var(--tetro-ink); font-size:13px; cursor:pointer; }
+.tetro-app select:focus-visible { outline:2px solid var(--tetro-accent); outline-offset:1px; }
+.tetro-app details>summary { list-style:none; display:flex; align-items:center; gap:8px; cursor:pointer; }
+.tetro-app details>summary::-webkit-details-marker { display:none; }
+.tetro-app details>summary::before { content:''; flex:0 0 auto; width:7px; height:7px; margin:0 4px 0 2px; border-right:1.6px solid var(--tetro-muted); border-bottom:1.6px solid var(--tetro-muted); transform:rotate(-45deg); transition:transform .15s; }
+.tetro-app details[open]>summary::before { transform:rotate(45deg); }
+.tetro-app progress { appearance:none; -webkit-appearance:none; height:6px; border:0; border-radius:3px; background:var(--tetro-line); overflow:hidden; }
+.tetro-app progress::-webkit-progress-bar { background:var(--tetro-line); border-radius:3px; }
+.tetro-app progress::-webkit-progress-value { background:var(--tetro-accent); border-radius:3px; transition:width .2s; }
+
+/* Sidebar: a live, softly pulsing record light while recording. */
+.tetro-navigation .tetro-new[data-live] { color:var(--tetro-red); }
+.tetro-navigation .tetro-new[data-live] .tetro-glyph-rec { animation:tetro-rec-pulse 1.8s ease-in-out infinite; box-shadow:0 0 0 0 color-mix(in srgb,var(--tetro-red) 50%,transparent); }
+@keyframes tetro-rec-pulse { 0%,100% { opacity:1; box-shadow:0 0 0 0 color-mix(in srgb,var(--tetro-red) 45%,transparent); } 50% { opacity:.45; box-shadow:0 0 0 5px transparent; } }
+@media (prefers-reduced-motion:reduce) { .tetro-navigation .tetro-new[data-live] .tetro-glyph-rec { animation:none; } }
+/* Round 2 */
+@container tetro-settings (max-width:760px) { .tetro-settings-layout { grid-template-rows:auto 1fr; } }
+.tetro-key.tetro-key-square { width:30px; padding:0!important; justify-content:center; }
+.tetro-key.tetro-key-square:hover:not(:disabled) { color:var(--tetro-red); }
+.tetro-pane-toolbar .tetro-template-select { max-width:220px; }
+.tetro-summary-footer { padding-left:16px; }
+/* Checklist items: keep the checkbox on the first line when the text wraps. */
+.tetro-summary-scroll .bn-block-content[data-content-type=checkListItem] { align-items:flex-start!important; }
+.tetro-summary-scroll .bn-block-content[data-content-type=checkListItem] > div:first-child { margin-top:.3em; }
+.tetro-summary-scroll .bn-block-content[data-content-type=checkListItem] p { padding-left:0; text-indent:0; }
+/* Switches: the "on" state reads at a glance (tinted track), LED kept. */
+.tetro-app button[role=switch][data-state=checked] { background:color-mix(in srgb,var(--tetro-accent) 16%,var(--tetro-panel))!important; border-color:color-mix(in srgb,var(--tetro-accent) 55%,var(--tetro-line-strong))!important; }
+
+/* Onboarding: model choices */
+.tetro-setup-card { border:1px solid var(--tetro-line); border-radius:12px; background:var(--tetro-paper); padding:14px 16px; }
+.tetro-setup-model { display:flex; align-items:center; gap:12px; margin-top:12px; padding:10px 12px; border:1px solid var(--tetro-line); border-radius:9px; background:var(--tetro-panel); }
+.tetro-setup-model.is-recommended { border-color:color-mix(in srgb,var(--tetro-accent) 40%,var(--tetro-line)); background:color-mix(in srgb,var(--tetro-accent) 5%,var(--tetro-panel)); }
+.tetro-setup-model strong { font-size:13.5px; font-weight:600; color:var(--tetro-ink); }
+.tetro-setup-model small { display:block; margin-top:3px; font-size:12px; line-height:1.45; color:var(--tetro-muted); }
+.tetro-setup-meta { font-family:var(--font-tetro-mono),monospace; font-size:11px; color:var(--tetro-faint); margin-left:4px; }
+.tetro-setup-badge { display:inline-block; margin-left:4px; padding:1px 7px; border-radius:5px; font-size:10.5px; font-weight:600; color:var(--tetro-accent-ink,var(--tetro-accent)); background:color-mix(in srgb,var(--tetro-accent) 12%,transparent); vertical-align:1px; }
+.tetro-setup-ready { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; font-size:12.5px; color:var(--tetro-muted); }
+.tetro-setup-ready svg { width:15px; height:15px; color:var(--tetro-accent-ink,var(--tetro-accent)); }
+.tetro-setup-footer { display:flex; flex-direction:column; gap:8px; width:100%; }
+.tetro-setup-note { text-align:center; font-size:12px; color:var(--tetro-muted); }
+.tetro-setup-title { font-size:15px; font-weight:600; color:var(--tetro-ink); }
+.tetro-setup-title span { margin-left:6px; font-size:12.5px; font-weight:400; color:var(--tetro-muted); }
+.tetro-setup-card { padding:12px 14px; }
+.tetro-setup-model { margin-top:8px; padding:9px 12px; }
+/* Welcome: compact feature tiles */
+.tetro-welcome-features { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; max-width:600px; margin:0 auto; }
+.tetro-welcome-feature { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--tetro-line); border-radius:10px; background:var(--tetro-paper); }
+.tetro-welcome-feature > span { display:grid; place-items:center; flex:0 0 26px; height:26px; border-radius:7px; color:var(--tetro-accent-ink,var(--tetro-accent)); background:color-mix(in srgb,var(--tetro-accent) 10%,var(--tetro-panel)); }
+.tetro-welcome-feature > span svg { width:14px; height:14px; }
+.tetro-welcome-feature strong { display:block; font-size:12.5px; font-weight:600; line-height:1.3; color:var(--tetro-ink); }
+.tetro-welcome-feature p { margin-top:2px; font-size:11.5px; line-height:1.4; color:var(--tetro-muted); }
+@media (max-width:560px) { .tetro-welcome-features { grid-template-columns:1fr; } }

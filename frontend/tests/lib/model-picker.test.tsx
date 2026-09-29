@@ -2,7 +2,8 @@ import React from 'react';
 import { afterAll, expect, mock, test } from 'bun:test';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 const passthrough = ({ children }: any) => <div>{children}</div>;
-mock.module('next/navigation', () => ({ useRouter: () => ({ push: () => {} }) }));
+const routes: string[] = [];
+mock.module('next/navigation', () => ({ useRouter: () => ({ push: (href: string) => routes.push(href) }) }));
 mock.module('../../src/components/ui/dialog', () => ({ Dialog: passthrough, DialogContent: passthrough, DialogTitle: passthrough, DialogDescription: passthrough }));
 mock.module('../../src/components/ui/popover', () => ({ Popover: passthrough, PopoverContent: passthrough, PopoverTrigger: passthrough }));
 mock.module('../../src/components/ui/command', () => ({ Command: passthrough, CommandEmpty: passthrough, CommandGroup: passthrough, CommandInput: () => <input />, CommandList: passthrough, CommandItem: ({ children, onSelect, value, disabled }: any) => <button data-choice={value} disabled={disabled} onClick={onSelect}>{children}</button> }));
@@ -38,4 +39,23 @@ test('the app and meeting receive a new choice only after persistence succeeds',
   await act(async () => { finish(next); await tick(); });
   expect(changes).toEqual([next]); expect(saved).toEqual([next]); expect(opened).toEqual([false]);
   act(() => view.unmount());
+});
+
+test('download transcription models routes to the expanded catalogue', async () => {
+  const values = new Map<string, string>();
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { setItem: (key: string, value: string) => values.set(key, value) } });
+  let view!: ReactTestRenderer;
+  try {
+    await act(async () => { view = create(<ModelPicker purpose="transcription" presentation="dialog" open />); await tick(); });
+    act(() => view.root.findAllByType('button').find(button => button.props.className?.includes('tetro-chooser-more'))!.props.onClick());
+    expect(routes.at(-1)).toBe('/settings');
+    expect(values.get('tetro.settingsTab')).toBe('models');
+    expect(values.get('tetro.modelsSection')).toBe('transcription');
+    expect(values.get('tetro.browseTranscriptionModels')).toBe('1');
+  } finally {
+    act(() => view?.unmount());
+    if (previous) Object.defineProperty(globalThis, 'sessionStorage', previous);
+    else Reflect.deleteProperty(globalThis, 'sessionStorage');
+  }
 });

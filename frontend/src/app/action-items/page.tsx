@@ -82,12 +82,12 @@ export default function ActionItemsPage() {
     {error && <p className="tetro-editor-error tetro-page-error" role="alert">{error} <button className="tetro-link" onClick={() => void load()}>Retry</button></p>}
     <div className="tetro-template-columns"><article className="tetro-actions">
       {items === null ? <p className="tetro-muted">{error ? 'Your existing tasks are still saved.' : 'Collecting action items…'}</p>
-        : !groups.length ? <div className="tetro-template-empty"><p>{narrowed ? 'No tasks match these filters.' : filter === 'open' ? (items.length ? 'Everything is done.' : 'No action items yet. They appear here after Tetro writes your notes.') : 'Nothing here yet.'}</p>{narrowed && <button className="tetro-link" onClick={() => { setQuery(''); setPerson(''); setDueFilter('all'); }}>Clear filters</button>}</div>
+        : !groups.length ? <div className="tetro-template-empty"><p>{narrowed ? 'No tasks match these filters.' : filter === 'open' ? (items.length ? 'Everything is done.' : 'No action items yet. They appear here after Tetro writes your summary.') : 'Nothing here yet.'}</p>{narrowed && <button className="tetro-link" onClick={() => { setQuery(''); setPerson(''); setDueFilter('all'); }}>Clear filters</button>}</div>
         : groups.map(([id, g]) => <section key={id} className="tetro-actions-group">
           <header><button className="tetro-actions-meeting" onClick={() => router.push(`/meeting-details?id=${encodeURIComponent(id)}`)}>{g.title}</button><time>{new Date(g.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</time></header>
           <ul>{g.items.map(i => <li key={i.key} data-done={i.done || undefined}>
             <button role="checkbox" aria-checked={i.done} disabled={pending.has(i.key)} className="tetro-check" onClick={() => void toggle(i)} aria-label={i.done ? `Mark “${i.text}” as open` : `Mark “${i.text}” as done`}>{i.done && <Check />}</button>
-            <span>{i.text}{i.owner && <em className="tetro-tag">{i.owner}</em>}{i.due && <em className="tetro-tag">Due {i.due}</em>}{!i.source_latest && <em className="tetro-tag" title="Kept from an earlier version of these notes">Earlier notes</em>}</span>
+            <span>{i.text}{i.owner && <em className="tetro-tag">{i.owner}</em>}{i.due && <em className="tetro-tag">Due {i.due}</em>}{!i.source_latest && <em className="tetro-tag" title="Kept from an earlier version of this summary">Earlier summary</em>}</span>
             <button className="tetro-icon" title="Edit task" aria-label={`Edit task: ${i.text}`} onClick={() => setEdit({ ...i })}><Pencil /></button>
           </li>)}</ul>
         </section>)}

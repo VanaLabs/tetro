@@ -4,17 +4,21 @@ import { cn } from '@/lib/utils';
 import { ProgressIndicator } from './shared/ProgressIndicator';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import type { OnboardingContainerProps } from '@/types/onboarding';
+import styles from './OnboardingContainer.module.css';
 
 export function OnboardingContainer({
   title,
   description,
   children,
+  footer,
   step,
   totalSteps = 5,
   stepOffset = 0,
   hideProgress = false,
+  centered = false,
   className,
   showNavigation = false,
+  navigationDisabled = false,
   onNext,
   onPrevious,
   canGoNext = true,
@@ -44,14 +48,16 @@ export function OnboardingContainer({
 
   return (
     <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50 overflow-hidden">
-      <div className={cn('w-full max-w-2xl h-full max-h-screen flex flex-col px-6 py-6', className)}>
+      <div className={cn(styles.shell, className)} data-step={step}>
         {/* Progress Indicator with Navigation - Fixed */}
         {step && !hideProgress && (
-          <div className="mb-2 relative flex-shrink-0">
+          <div className={styles.progress}>
             {/* Navigation Buttons */}
             {showNavigation && (
               <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 flex justify-between pointer-events-none">
                 <button
+                  type="button"
+                  aria-label="Back to previous setup step"
                   onClick={handlePrevious}
                   disabled={!canGoPrevious || step === 1}
                   className={cn(
@@ -65,6 +71,8 @@ export function OnboardingContainer({
                 </button>
 
                 <button
+                  type="button"
+                  aria-label="Continue to next setup step"
                   onClick={handleNext}
                   disabled={!canGoNext || step === totalSteps}
                   className={cn(
@@ -80,24 +88,25 @@ export function OnboardingContainer({
             )}
 
             {/* Progress Indicator */}
-            <ProgressIndicator current={step} total={totalSteps} onStepClick={handleStepClick} />
+            <ProgressIndicator current={step} total={totalSteps} onStepClick={navigationDisabled ? undefined : handleStepClick} />
           </div>
         )}
 
         {/* Header - Fixed */}
-        <div className="mb-4 text-center space-y-3 flex-shrink-0">
-          <h1 className="text-4xl font-semibold text-gray-900 animate-fade-in-up">{title}</h1>
+        <div className={styles.header}>
+          <h1 className={styles.heading}>{title}</h1>
           {description && (
-            <p className="text-base text-gray-600 max-w-md mx-auto animate-fade-in-up delay-75">
+            <p className={styles.description}>
               {description}
             </p>
           )}
         </div>
 
         {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto pr-2">
+        <div className={cn(styles.content, centered && styles.centeredContent)}>
           <div className="space-y-6">{children}</div>
         </div>
+        {footer && <div className={styles.footer}><div className={styles.footerInner}>{footer}</div></div>}
       </div>
     </div>
   );

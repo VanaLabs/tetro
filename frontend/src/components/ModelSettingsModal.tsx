@@ -30,6 +30,10 @@ import {
 } from '@/components/ui/command';
 import { cn, isOllamaNotInstalledError } from '@/lib/utils';
 import { toast } from 'sonner';
+import { RECOMMENDED_SUMMARY_MODEL } from '@/lib/recommended-models';
+
+// Same model Tetro recommends on this device, pulled through Ollama.
+const RECOMMENDED_OLLAMA_SUMMARY_MODEL = RECOMMENDED_SUMMARY_MODEL;
 
 export interface ModelConfig {
   provider: 'ollama' | 'groq' | 'claude' | 'openai' | 'openrouter' | 'builtin-ai' | 'custom-openai';
@@ -129,9 +133,10 @@ export function ModelSettingsModal({
 
   const [models, setModels] = useState<OllamaModel[]>([]);
   const [error, setError] = useState<string>('');
-  const [apiKey, setApiKey] = useState<string | null>(modelConfig.apiKey || null);
+  const [apiKey, setApiKey] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
-  const [isApiKeyLocked, setIsApiKeyLocked] = useState<boolean>(!!modelConfig.apiKey?.trim());
+  const [hasSavedKey, setHasSavedKey] = useState(false);
+  const [isApiKeyLocked, setIsApiKeyLocked] = useState<boolean>(false);
   const [isLockButtonVibrating, setIsLockButtonVibrating] = useState<boolean>(false);
   const { serverAddress } = useSidebar();
   const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModel[]>([]);
@@ -152,7 +157,7 @@ export function ModelSettingsModal({
   // Custom OpenAI state
   const [customOpenAIEndpoint, setCustomOpenAIEndpoint] = useState<string>(modelConfig.customOpenAIEndpoint || '');
   const [customOpenAIModel, setCustomOpenAIModel] = useState<string>(modelConfig.customOpenAIModel || '');
-  const [customOpenAIApiKey, setCustomOpenAIApiKey] = useState<string>(modelConfig.customOpenAIApiKey || '');
+  const [customOpenAIApiKey, setCustomOpenAIApiKey] = useState<string>('');
   const [customMaxTokens, setCustomMaxTokens] = useState<string>(modelConfig.maxTokens?.toString() || '');
   const [customTemperature, setCustomTemperature] = useState<string>(modelConfig.temperature?.toString() || '');
   const [customTopP, setCustomTopP] = useState<string>(modelConfig.topP?.toString() || '');
@@ -211,8 +216,9 @@ export function ModelSettingsModal({
     try {
       const data = (await invoke('api_get_api_key', {
         provider,
-      })) as string;
-      setApiKey(data || '');
+      })) as boolean;
+      setHasSavedKey(data);
+      setApiKey('');
     } catch (err) {
       console.error('Error fetching API key:', err);
       setApiKey(null);
@@ -254,7 +260,7 @@ export function ModelSettingsModal({
   );
 
   const isDoneDisabled = saving ||
-    (requiresApiKey && (!apiKey || (typeof apiKey === 'string' && !apiKey.trim()))) ||
+    (requiresApiKey && !apiKey?.trim() && !hasSavedKey) ||
     (modelConfig.provider === 'ollama' && ollamaEndpointChanged) ||
     isCustomOpenAIInvalid;
 
@@ -271,18 +277,8 @@ export function ModelSettingsModal({
         if (data && data.provider !== null) {
           setModelConfig(data);
 
-          // Fetch API key if not included in response and provider requires it
-          if (data.provider !== 'ollama' && !data.apiKey) {
-            try {
-              const apiKeyData = await invoke('api_get_api_key', {
-                provider: data.provider
-              }) as string;
-              data.apiKey = apiKeyData;
-              setApiKey(apiKeyData);
-            } catch (err) {
-              console.error('Failed to fetch API key:', err);
-            }
-          }
+          data.apiKey = null;
+          if (['openai', 'claude', 'groq', 'openrouter'].includes(data.provider)) await fetchApiKey(data.provider);
 
           // Sync ollamaEndpoint state with fetched config
           if (data.ollamaEndpoint) {
@@ -298,7 +294,7 @@ export function ModelSettingsModal({
               if (customConfig) {
                 setCustomOpenAIEndpoint(customConfig.endpoint || '');
                 setCustomOpenAIModel(customConfig.model || '');
-                setCustomOpenAIApiKey(customConfig.apiKey || '');
+                setCustomOpenAIApiKey('');
                 setCustomMaxTokens(customConfig.maxTokens?.toString() || '');
                 setCustomTemperature(customConfig.temperature?.toString() || '');
                 setCustomTopP(customConfig.topP?.toString() || '');
@@ -358,7 +354,7 @@ export function ModelSettingsModal({
       // Always sync from modelConfig (which comes from context if available)
       setCustomOpenAIEndpoint(modelConfig.customOpenAIEndpoint || '');
       setCustomOpenAIModel(modelConfig.customOpenAIModel || '');
-      setCustomOpenAIApiKey(modelConfig.customOpenAIApiKey || '');
+      setCustomOpenAIApiKey('');
       setCustomMaxTokens(modelConfig.maxTokens?.toString() || '');
       setCustomTemperature(modelConfig.temperature?.toString() || '');
       setCustomTopP(modelConfig.topP?.toString() || '');
@@ -405,14 +401,15 @@ export function ModelSettingsModal({
     }
   }, [ollamaEndpoint, lastFetchedEndpoint, modelConfig.provider]);
 
-  // Sync local apiKey state when provider changes
+  // Connection flags never contain the saved key. Drafts are scoped to one provider.
   useEffect(() => {
-    if (providerApiKeys && requiresApiKey && modelConfig.provider !== 'custom-openai') {
-      const correctKey = providerApiKeys[modelConfig.provider as keyof typeof providerApiKeys];
-      if (correctKey !== apiKey) {
-        setApiKey(correctKey || '');
-        setIsApiKeyLocked(!!correctKey?.trim());
-      }
+    setApiKey('');
+    setIsApiKeyLocked(false);
+    if (providerApiKeys && requiresApiKey) {
+      setHasSavedKey(!!providerApiKeys[modelConfig.provider as keyof typeof providerApiKeys]);
+    } else {
+      setHasSavedKey(false);
+      if (requiresApiKey) void fetchApiKey(modelConfig.provider);
     }
   }, [modelConfig.provider, providerApiKeys, requiresApiKey]);
 
@@ -529,13 +526,13 @@ export function ModelSettingsModal({
 
   // Fetch OpenAI models from API
   const loadOpenAIModels = async (key: string | null) => {
-    if (!key?.trim()) {
+    if (!key?.trim() && !hasSavedKey) {
       setOpenaiModels([]); // Will use fallback via modelOptions
       return;
     }
     setIsLoadingOpenAI(true);
     try {
-      const data = (await invoke('get_openai_models', { apiKey: key })) as OpenAIModel[];
+      const data = (await invoke('get_openai_models', { apiKey: key?.trim() || null })) as OpenAIModel[];
       setOpenaiModels(data.map((m) => m.id));
     } catch (err) {
       console.error('Error loading OpenAI models:', err);
@@ -547,13 +544,13 @@ export function ModelSettingsModal({
 
   // Fetch Anthropic (Claude) models from API
   const loadClaudeModels = async (key: string | null) => {
-    if (!key?.trim()) {
+    if (!key?.trim() && !hasSavedKey) {
       setClaudeModels([]); // Will use fallback via modelOptions
       return;
     }
     setIsLoadingClaude(true);
     try {
-      const data = (await invoke('get_anthropic_models', { apiKey: key })) as AnthropicModel[];
+      const data = (await invoke('get_anthropic_models', { apiKey: key?.trim() || null })) as AnthropicModel[];
       setClaudeModels(data.map((m) => m.id));
     } catch (err) {
       console.error('Error loading Claude models:', err);
@@ -565,13 +562,13 @@ export function ModelSettingsModal({
 
   // Fetch Groq models from API
   const loadGroqModels = async (key: string | null) => {
-    if (!key?.trim()) {
+    if (!key?.trim() && !hasSavedKey) {
       setGroqModels([]); // Will use fallback via modelOptions
       return;
     }
     setIsLoadingGroq(true);
     try {
-      const data = (await invoke('get_groq_models', { apiKey: key })) as GroqModel[];
+      const data = (await invoke('get_groq_models', { apiKey: key?.trim() || null })) as GroqModel[];
       setGroqModels(data.map((m) => m.id));
     } catch (err) {
       console.error('Error loading Groq models:', err);
@@ -583,24 +580,24 @@ export function ModelSettingsModal({
 
   // Auto-fetch OpenAI models when provider is openai and we have an API key
   useEffect(() => {
-    if (modelConfig.provider === 'openai' && apiKey?.trim()) {
+    if (modelConfig.provider === 'openai' && (apiKey?.trim() || hasSavedKey)) {
       loadOpenAIModels(apiKey);
     }
-  }, [modelConfig.provider, apiKey]);
+  }, [modelConfig.provider, apiKey, hasSavedKey]);
 
   // Auto-fetch Claude models when provider is claude and we have an API key
   useEffect(() => {
-    if (modelConfig.provider === 'claude' && apiKey?.trim()) {
+    if (modelConfig.provider === 'claude' && (apiKey?.trim() || hasSavedKey)) {
       loadClaudeModels(apiKey);
     }
-  }, [modelConfig.provider, apiKey]);
+  }, [modelConfig.provider, apiKey, hasSavedKey]);
 
   // Auto-fetch Groq models when provider is groq and we have an API key
   useEffect(() => {
-    if (modelConfig.provider === 'groq' && apiKey?.trim()) {
+    if (modelConfig.provider === 'groq' && (apiKey?.trim() || hasSavedKey)) {
       loadGroqModels(apiKey);
     }
-  }, [modelConfig.provider, apiKey]);
+  }, [modelConfig.provider, apiKey, hasSavedKey]);
 
   // Restore cached model when async model lists become available
   useEffect(() => {
@@ -658,8 +655,11 @@ export function ModelSettingsModal({
       model: modelConfig.provider === 'custom-openai' ? customOpenAIModel.trim() : modelConfig.model,
     };
     await onSave(updatedConfig);
-    configContext?.setModelConfig(updatedConfig);
-    propsSetModelConfig(updatedConfig);
+    const publicConfig = { ...updatedConfig, apiKey: null, customOpenAIApiKey: null };
+    configContext?.setModelConfig(publicConfig);
+    propsSetModelConfig(publicConfig);
+    setApiKey(null);
+    setCustomOpenAIApiKey('');
 
     // Persist confirmed model choice to per-provider cache
     if (updatedConfig.model) {
@@ -668,7 +668,8 @@ export function ModelSettingsModal({
 
     // Update provider-specific key in context
     if (updateProviderApiKey && updatedConfig.apiKey && updatedConfig.provider !== 'custom-openai') {
-      updateProviderApiKey(updatedConfig.provider, updatedConfig.apiKey);
+      updateProviderApiKey(updatedConfig.provider, true);
+      setHasSavedKey(true);
     }
 
     } catch (error) {
@@ -723,7 +724,7 @@ export function ModelSettingsModal({
 
   // Function to download recommended model
   const downloadRecommendedModel = async () => {
-    const recommendedModel = 'gemma3:1b';
+    const recommendedModel = RECOMMENDED_OLLAMA_SUMMARY_MODEL;
 
     // Prevent duplicate downloads (defense in depth - backend also checks)
     if (isDownloading(recommendedModel)) {
@@ -827,7 +828,7 @@ export function ModelSettingsModal({
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">Model Settings</h3>
+        <h3 className="text-lg font-semibold">Model settings</h3>
       </div>
 
       <div className="space-y-4">
@@ -882,7 +883,7 @@ export function ModelSettingsModal({
                     if (config) {
                       setCustomOpenAIEndpoint(config.endpoint || '');
                       setCustomOpenAIModel(config.model || '');
-                      setCustomOpenAIApiKey(config.apiKey || '');
+                      setCustomOpenAIApiKey('');
                       setCustomMaxTokens(config.maxTokens?.toString() || '');
                       setCustomTemperature(config.temperature?.toString() || '');
                       setCustomTopP(config.topP?.toString() || '');
@@ -1016,7 +1017,7 @@ export function ModelSettingsModal({
                 className="flex items-center justify-between cursor-pointer py-2"
                 onClick={() => setIsCustomOpenAIAdvancedOpen(!isCustomOpenAIAdvancedOpen)}
               >
-                <Label className="cursor-pointer">Advanced Options</Label>
+                <Label className="cursor-pointer">Advanced options</Label>
                 {isCustomOpenAIAdvancedOpen ? (
                   <ChevronUp className="h-4 w-4 text-muted-foreground" />
                 ) : (
@@ -1027,7 +1028,7 @@ export function ModelSettingsModal({
               {isCustomOpenAIAdvancedOpen && (
                 <div className="space-y-3 pl-2 border-l-2 border-muted mt-2">
                   <div>
-                    <Label htmlFor="custom-max-tokens">Max Tokens</Label>
+                    <Label htmlFor="custom-max-tokens">Max tokens</Label>
                     <Input
                       id="custom-max-tokens"
                       type="number"
@@ -1100,9 +1101,10 @@ export function ModelSettingsModal({
               <Input
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKey || ''}
+                aria-description={hasSavedKey ? "A key is saved securely. Leave blank to keep it." : undefined}
                 onChange={(e) => setApiKey(e.target.value)}
                 disabled={isApiKeyLocked}
-                placeholder="Enter your API key"
+                placeholder={hasSavedKey ? "Key saved; leave blank to keep it" : "Enter your API key"}
                 className="pr-24"
               />
               {isApiKeyLocked && apiKey?.trim() && (
@@ -1198,7 +1200,7 @@ export function ModelSettingsModal({
                     ) : (
                       <>
                         <RefreshCw className="mr-2 h-4 w-4" />
-                        Fetch Models
+                        Fetch models
                       </>
                     )}
                   </Button>
@@ -1206,7 +1208,7 @@ export function ModelSettingsModal({
                 {ollamaEndpointChanged && !error && (
                   <Alert className="mt-3 border-yellow-500 bg-yellow-50">
                     <AlertDescription className="text-yellow-800">
-                      Endpoint changed. Please click &quot;Fetch Models&quot; to load models from the new endpoint before saving.
+                      Endpoint changed. Please click &quot;Fetch models&quot; to load models from the new endpoint before saving.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -1263,7 +1265,7 @@ export function ModelSettingsModal({
                       Download Ollama
                     </Button>
                     <div className="text-sm text-muted-foreground text-center">
-                      After installing Ollama, restart this application and click &quot;Fetch Models&quot; to continue.
+                      After installing Ollama, restart this application and click &quot;Fetch models&quot; to continue.
                     </div>
                   </div>
                 ) : (
@@ -1272,8 +1274,8 @@ export function ModelSettingsModal({
                     <Alert className="mb-4">
                       <AlertDescription>
                         {ollamaEndpointChanged
-                          ? 'Endpoint changed. Click "Fetch Models" to load models from the new endpoint.'
-                          : 'No models found. Download a recommended model or click "Fetch Models" to load available Ollama models.'}
+                          ? 'Endpoint changed. Click "Fetch models" to load models from the new endpoint.'
+                          : 'No models found. Download a recommended model or click "Fetch models" to load available Ollama models.'}
                       </AlertDescription>
                     </Alert>
                     {!ollamaEndpointChanged && (
@@ -1282,35 +1284,35 @@ export function ModelSettingsModal({
                           variant="outline"
                           size="sm"
                           onClick={downloadRecommendedModel}
-                          disabled={isDownloading('gemma3:1b')}
+                          disabled={isDownloading(RECOMMENDED_OLLAMA_SUMMARY_MODEL)}
                           className="w-full"
                         >
-                          {isDownloading('gemma3:1b') ? (
+                          {isDownloading(RECOMMENDED_OLLAMA_SUMMARY_MODEL) ? (
                             <>
                               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                              Downloading gemma3:1b...
+                              Downloading {RECOMMENDED_OLLAMA_SUMMARY_MODEL}...
                             </>
                           ) : (
                             <>
                               <Download className="mr-2 h-4 w-4" />
-                              Download gemma3:1b (Recommended, ~800MB)
+                              Download {RECOMMENDED_OLLAMA_SUMMARY_MODEL} (Recommended)
                             </>
                           )}
                         </Button>
 
-                        {/* Show progress for gemma3:1b download */}
-                        {isDownloading('gemma3:1b') && getProgress('gemma3:1b') !== undefined && (
+                        {/* Show progress for the recommended model download */}
+                        {isDownloading(RECOMMENDED_OLLAMA_SUMMARY_MODEL) && getProgress(RECOMMENDED_OLLAMA_SUMMARY_MODEL) !== undefined && (
                           <div className="bg-white rounded-md border p-3">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-blue-600">Downloading gemma3:1b</span>
+                              <span className="text-sm font-medium text-blue-600">Downloading {RECOMMENDED_OLLAMA_SUMMARY_MODEL}</span>
                               <span className="text-sm font-semibold text-blue-600">
-                                {Math.round(getProgress('gemma3:1b')!)}%
+                                {Math.round(getProgress(RECOMMENDED_OLLAMA_SUMMARY_MODEL)!)}%
                               </span>
                             </div>
                             <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-300"
-                                style={{ width: `${getProgress('gemma3:1b')}%` }}
+                                style={{ width: `${getProgress(RECOMMENDED_OLLAMA_SUMMARY_MODEL)}%` }}
                               />
                             </div>
                           </div>

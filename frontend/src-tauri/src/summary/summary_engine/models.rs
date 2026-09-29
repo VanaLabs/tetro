@@ -126,17 +126,17 @@ impl SamplingParams {
 /// Definition of a built-in AI model with all metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelDef {
-    /// Model name in format "family:variant" (e.g., "gemma3:1b")
+    /// Model name in format "family:variant" (e.g., "qwen3.5:2b")
     /// This is what's stored in database as model field when provider="builtin-ai"
     pub name: String,
 
-    /// Display name for UI (e.g., "Gemma 3 1B (Fast)")
+    /// Display name for UI (e.g., "Qwen 3.5 2B (Balanced)")
     pub display_name: String,
 
-    /// GGUF filename on disk (e.g., "gemma-3-1b-it-q4_0.gguf")
+    /// GGUF filename on disk (e.g., "Qwen3.5-2B-Q4_K_M.gguf")
     pub gguf_file: String,
 
-    /// Template name for prompt formatting (e.g., "gemma3")
+    /// Template name for prompt formatting (e.g., "qwen3.5_nonthinking")
     pub template: String,
 
     /// Download URL (HuggingFace or other source)
@@ -144,6 +144,9 @@ pub struct ModelDef {
 
     /// File size in MiB. The field name is kept for API compatibility.
     pub size_mb: u64,
+
+    /// Exact size of the pinned GGUF. A nearly complete download is not usable.
+    pub size_bytes: u64,
 
     /// Context window size in tokens (configurable per model!)
     /// This is used for chunking in processor.rs
@@ -182,10 +185,11 @@ pub fn get_available_models() -> Vec<ModelDef> {
             template: "qwen3.5_nonthinking".to_string(),
             download_url: mirror_url("Qwen3.5-2B-Q4_K_M.gguf"),
             size_mb: 1221,
+            size_bytes: 1280835840,
             context_size: 32768,
             layer_count: 24,
             sampling: SamplingParams::qwen35_summary(vec!["<|im_end|>".to_string()]),
-            description: "A smaller Qwen option for everyday notes. Uses less memory than the 4B model.".to_string(),
+            description: "A smaller Qwen option for everyday summaries. Uses less memory than the 4B model.".to_string(),
         },
         // Qwen 3.5 4B - High quality tier
         ModelDef {
@@ -195,10 +199,11 @@ pub fn get_available_models() -> Vec<ModelDef> {
             template: "qwen3.5_nonthinking".to_string(),
             download_url: mirror_url("Qwen3.5-4B-Q4_K_M.gguf"),
             size_mb: 2614,
+            size_bytes: 2740937888,
             context_size: 32768,
             layer_count: 32,
             sampling: SamplingParams::qwen35_summary(vec!["<|im_end|>".to_string()]),
-            description: "A larger Qwen option for detailed notes. Needs more memory and time than the 2B model.".to_string(),
+            description: "A larger Qwen option for detailed summaries. Needs more memory and time than the 2B model.".to_string(),
         },
         // Gemma 3 4B - Legacy alternative retained for users who prefer Gemma output.
         ModelDef {
@@ -208,10 +213,11 @@ pub fn get_available_models() -> Vec<ModelDef> {
             template: "gemma3".to_string(),
             download_url: mirror_url("gemma-3-4b-it-Q4_K_M.gguf"),
             size_mb: 2374,
+            size_bytes: 2489758112,
             context_size: 32768,
             layer_count: 35,
             sampling: SamplingParams::gemma3_instruct(vec!["<end_of_turn>".to_string()]),
-            description: "An alternative for notes with Gemma. Needs more memory than its download size.".to_string(),
+            description: "An alternative for summaries with Gemma. Needs more memory than its download size.".to_string(),
         },
         // Gemma 3 1B - Visible legacy tier retained for already-shipped users.
         ModelDef {
@@ -221,10 +227,11 @@ pub fn get_available_models() -> Vec<ModelDef> {
             template: "gemma3".to_string(),
             download_url: mirror_url("gemma-3-1b-it-Q8_0.gguf"),
             size_mb: 1019,
+            size_bytes: 1069306624,
             context_size: 32768,
             layer_count: 26,
             sampling: SamplingParams::gemma3_instruct(vec!["<end_of_turn>".to_string()]),
-            description: "A small option for short, simple notes. Check details carefully; memory use exceeds the download size.".to_string(),
+            description: "A small option for short, simple summaries. Check details carefully; memory use exceeds the download size.".to_string(),
         },
     ]
 }

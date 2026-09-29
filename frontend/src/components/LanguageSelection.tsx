@@ -147,7 +147,7 @@ export function LanguageSelection({
     <div className="space-y-4">
       <div className="space-y-2">
         <LanguageChooser options={availableLanguages.map(l => ({ code: l.code, label: l.name }))} value={displayedLanguage} onChange={handleLanguageChange} disabled={controlsDisabled} />
-        <p className="text-xs text-muted-foreground">This controls speech recognition. Notes have their own language choice.</p>
+        <p className="text-xs text-muted-foreground">This controls speech recognition. Summaries have their own language choice.</p>
 
         {pendingArmenianDownload && (
           <div className="space-y-3 rounded border border-blue-200 bg-blue-50 p-3 text-blue-900">

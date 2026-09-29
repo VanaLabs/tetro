@@ -24,7 +24,8 @@ export interface TranscriptSettingsProps {
 }
 
 export function TranscriptSettings({ transcriptModelConfig, setTranscriptModelConfig, onModelSelect }: TranscriptSettingsProps) {
-    const [apiKey, setApiKey] = useState<string | null>(transcriptModelConfig.apiKey || null);
+    const [apiKey, setApiKey] = useState<string | null>(null);
+    const [hasSavedKey, setHasSavedKey] = useState(false);
     const [showApiKey, setShowApiKey] = useState<boolean>(false);
     const [isApiKeyLocked, setIsApiKeyLocked] = useState<boolean>(true);
     const [isLockButtonVibrating, setIsLockButtonVibrating] = useState<boolean>(false);
@@ -44,9 +45,9 @@ export function TranscriptSettings({ transcriptModelConfig, setTranscriptModelCo
     const fetchApiKey = async (provider: string) => {
         try {
 
-            const data = await invoke('api_get_transcript_api_key', { provider }) as string;
-
-            setApiKey(data || '');
+            const data = await invoke<boolean>('api_get_transcript_api_key', { provider });
+            setHasSavedKey(data);
+            setApiKey('');
         } catch (err) {
             console.error('Error fetching API key:', err);
             setApiKey(null);
@@ -101,7 +102,7 @@ export function TranscriptSettings({ transcriptModelConfig, setTranscriptModelCo
         <div>
             <div>
                 {/* <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Transcript Settings</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Transcript settings</h3>
                 </div> */}
                 <div className="tetro-settings-stack">
                     <VocabularyEditor />

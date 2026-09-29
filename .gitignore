@@ -90,3 +90,18 @@ docs/TETRO-CHANGES-FOR-REVIEW.md
 docs/TETRO-ROADMAP.md
 
 frontend/src-tauri/binaries/
+
+# Internal release plans, security reviews and private backup material.
+/internal/
+
+# Bundled onboarding sound (user recordings remain ignored).
+!frontend/public/tetro/audio-access-test.wav
+
+# Release signing secrets must never enter Git.
+*.key
+*.p12
+*.p8
+
+# Claude working files (previews, patches, logs) and the local UI-polish patch.
+/Claude outputs/
+/tetro-ui-polish.patch

@@ -282,7 +282,7 @@ export function useCopyOperations({
       await invokeTauri('save_markdown_file', { filePath: exportPath, content: parts.join('\n\n') + '\n' });
       toast.success('Exported', { description: exportPath });
     } catch (error) {
-      console.error('Failed to export notes:', error);
+      console.error('Failed to export summary:', error);
       toast.error('Couldn’t export the summary', { description: String(error) });
     } finally {
       setIsExporting(false);

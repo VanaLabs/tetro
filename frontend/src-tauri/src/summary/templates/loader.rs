@@ -19,9 +19,8 @@ pub fn set_bundled_templates_dir(path: PathBuf) {
 /// Get the user's custom templates directory path
 ///
 /// Returns the platform-specific application data directory for custom templates:
-/// - macOS: ~/Library/Application Support/Meetily/templates/
-/// - Windows: %APPDATA%\Meetily\templates\
-/// - Linux: ~/.config/Meetily/templates/
+/// - macOS: ~/Library/Application Support/am.vanalabs.tetro/templates/
+/// - Windows/Linux: templates/ inside Tetro's app data directory
 fn get_custom_templates_dir() -> Option<PathBuf> {
     let mut path = crate::app_profile::data_dir()?;
     path.push("templates");

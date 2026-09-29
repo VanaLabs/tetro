@@ -1,0 +1,16 @@
+.greeting {
+  display:block;
+  font-family:inherit;
+  font-size:inherit;
+  font-weight:inherit;
+  letter-spacing:normal;
+  line-height:1.25;
+}
+
+.brandLine {
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  width:100%;
+  margin-top:6px;
+}

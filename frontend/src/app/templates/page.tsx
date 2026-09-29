@@ -2,17 +2,31 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import { BookOpen, Copy, Download, Pencil, Plus, RefreshCw, RotateCcw, Trash2, Upload } from 'lucide-react';
+import { Copy, Download, FileText, Handshake, HeartHandshake, Lightbulb, MessagesSquare, MicVocal, Milestone, NotebookPen, Pencil, Plus, RefreshCw, RotateCcw, Route, Sunrise, Trash2, Upload, UsersRound, type LucideIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { TemplateEditor, type TemplateBody } from '@/components/tetro/TemplateEditor';
 import { resetTemplateSuggestionCache } from '@/hooks/useTemplateSuggestion';
 import { templateExample } from '@/lib/template-preview';
+import { isEverydayTemplate, sortTemplates } from '@/lib/template-catalog';
 
 type TemplateInfo = { id: string; name: string; description: string; is_custom?: boolean; has_original?: boolean };
 type FullTemplate = { id: string; template: TemplateBody; is_custom: boolean; has_original: boolean };
 type Editing = { id?: string; initial?: TemplateBody } | null;
 
 const FORMAT_LABEL = { paragraph: 'Paragraph', list: 'Bullet list', string: 'One line' } as const;
+const TEMPLATE_ICONS: Record<string, LucideIcon> = {
+  standard_meeting: FileText,
+  ideas_and_notes: Lightbulb,
+  team_meeting: UsersRound,
+  interview: MessagesSquare,
+  daily_standup: Sunrise,
+  plan: Route,
+  project_sync: Milestone,
+  retrospective: RotateCcw,
+  sales_marketing_client_call: Handshake,
+  podcast_pre_interview: MicVocal,
+  psychatric_session: HeartHandshake,
+};
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TemplateInfo[]>([]);
@@ -72,9 +86,18 @@ export default function TemplatesPage() {
     } catch (e) { toast.error(String(e)); }
   };
 
-  const visible = templates
-    .filter(t => `${t.name} ${t.description}`.toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => Number(!!b.is_custom && !b.has_original) - Number(!!a.is_custom && !a.has_original));
+  const visible = sortTemplates(templates
+    .filter(t => `${t.name} ${t.description}`.toLowerCase().includes(query.toLowerCase())));
+  const everyday = visible.filter(t => isEverydayTemplate(t.id));
+  const more = visible.filter(t => !isEverydayTemplate(t.id));
+  const templateButton = (t: TemplateInfo) => {
+    const isUserMade = Boolean(t.is_custom && !t.has_original);
+    const Icon = isUserMade ? NotebookPen : (TEMPLATE_ICONS[t.id] ?? FileText);
+    return <button key={t.id} onClick={() => setSelectedId(t.id)} className={selectedId === t.id ? 'selected' : ''} aria-current={selectedId === t.id ? 'true' : undefined}>
+      <span className={isUserMade ? 'tetro-template-icon tetro-template-icon-custom' : 'tetro-template-icon'}><Icon aria-hidden="true" focusable="false" strokeWidth={1.8} /></span>
+      <span><strong>{t.name}{t.is_custom && <em className="tetro-tag">{t.has_original ? 'Customized' : 'Yours'}</em>}</strong><small>{t.description}</small></span>
+    </button>;
+  };
 
   return <section className="tetro-template-page">
     <div className="tetro-page-toolbar">
@@ -91,10 +114,9 @@ export default function TemplatesPage() {
       <TemplateEditor key={editing.id ?? 'new'} templateId={editing.id} initial={editing.initial} onSaved={id => void onSaved(id)} onClose={() => setEditing(null)} />
     </article></div> : <div className="tetro-template-columns">
       <nav aria-label="Summary templates">
-        {loading ? <p className="tetro-muted">Loading templates…</p> : visible.map(t => <button key={t.id} onClick={() => setSelectedId(t.id)} className={selectedId === t.id ? 'selected' : ''}>
-          <BookOpen />
-          <span><strong>{t.name}{t.is_custom && <em className="tetro-tag">{t.has_original ? 'Customized' : 'Yours'}</em>}</strong><small>{t.description}</small></span>
-        </button>)}
+        {loading && <p className="tetro-muted">Loading templates…</p>}
+        {!loading && everyday.length > 0 && <><p className="tetro-template-group-label">Everyday</p>{everyday.map(templateButton)}</>}
+        {!loading && more.length > 0 && <><p className="tetro-template-group-label">More templates</p>{more.map(templateButton)}</>}
         {!loading && !visible.length && <p className="tetro-muted">No templates match “{query}”.</p>}
       </nav>
       <article>
@@ -110,12 +132,12 @@ export default function TemplatesPage() {
               {selected.is_custom && <button className="tetro-key" onClick={() => setConfirmDelete(true)}>{selected.has_original ? <><RotateCcw />Restore original</> : <><Trash2 />Delete</>}</button>}
             </div>
           </div>
-          <h3>Example notes</h3>
-          <p className="tetro-muted">Fictional example content. The template instructions determine the final format. Check generated notes against your conversation.</p>
+          <h3>Example summaries</h3>
+          <p className="tetro-muted">Fictional example content. Sections without relevant content are omitted. Check generated summaries against your recording.</p>
           <ol className="tetro-template-sections">
             {selected.template.sections.map((s, i) => <li key={`${s.title}-${i}`}>
               <b>{s.title}</b>
-              {s.format === 'list' ? <ul>{templateExample(s).map((line,i) => <li key={i}>{line}</li>)}</ul> : <p>{templateExample(s)[0]}</p>}
+              {s.format === 'list' ? <ul>{templateExample(s, selected.id).map((line,i) => <li key={i}>{line}</li>)}</ul> : <p>{templateExample(s, selected.id)[0]}</p>}
             </li>)}
           </ol>
           <details className="tetro-template-instructions"><summary>Template instructions</summary>{selected.template.sections.map((s,i) => <p key={i}><b>{s.title}:</b> {s.instruction}</p>)}</details>

@@ -1,10 +1,10 @@
 {
-  "name": "Plan",
-  "description": "Turn an informal voice note into a concrete, executable plan with workflows, milestones, ownership, risks, and next actions.",
+  "name": "Plan & Next Steps",
+  "description": "Turn a stated goal into a plan with steps, milestones, ownership, and immediate next actions.",
   "sections": [
     {
       "title": "Plan Overview",
-      "instruction": "Write a concise overview of the proposed plan: its goal, intended outcome, current status, and why it matters as explicitly stated in the transcript. Use only transcript facts; write Not specified for anything unspoken.",
+      "instruction": "Write a concise overview of the proposed plan: its goal, intended outcome, current status, and why it matters as explicitly stated in the transcript. Use only transcript facts and omit details that were not stated.",
       "format": "paragraph"
     },
     {
@@ -27,7 +27,7 @@
     },
     {
       "title": "Workflow Graph",
-      "instruction": "Translate any described process into a Mermaid flowchart inside a fenced code block tagged `mermaid`. Start with `flowchart TD`. Show sequence, decisions, loops, handoffs, and parallel work when stated. Use short node labels, connect nodes with arrows, and label decision branches when the transcript provides the condition. Do not invent missing steps; mark an unresolved branch as `Decision needed`. After the code block, add one short plain-language note about the flow. If no process is described, write None noted in this section.",
+      "instruction": "Translate any described process into a Mermaid flowchart inside a fenced code block tagged `mermaid`. Start with `flowchart TD`. Show sequence, decisions, loops, handoffs, and parallel work when stated. Use short node labels, connect nodes with arrows, and label decision branches when the transcript provides the condition. Do not invent missing steps; mark an unresolved branch as `Decision needed`. After the code block, add one short plain-language note about the flow. Omit this section when no process was described.",
       "format": "paragraph"
     },
     {
@@ -38,7 +38,7 @@
     },
     {
       "title": "Roles, Ownership & Handoffs",
-      "instruction": "Capture named people, teams, responsibilities, approvers, and handoffs explicitly assigned or discussed. Use Not specified where ownership is not stated.",
+      "instruction": "Capture named people, teams, responsibilities, approvers, and handoffs explicitly assigned or discussed. Leave unstated ownership out rather than guessing.",
       "format": "list",
       "item_format": "| **Person / Team** | **Responsibility** | **Handoff / Approver** | **Timing** |\n| --- | --- | --- | --- |"
     },
@@ -49,7 +49,7 @@
       "item_format": "| **Risk / Dependency / Question** | **Impact or Why It Matters** | **Mitigation / Decision Needed** | **Owner** |\n| --- | --- | --- | --- |"
     },
     {
-      "title": "Next Actions",
+      "title": "Next Steps",
       "instruction": "Turn only explicitly agreed or clearly requested next steps into concrete tasks. Include owner, due date, priority, and dependency when stated. Do not convert general ideas into commitments.",
       "format": "list",
       "item_format": "| **Owner** | **Action** | **Due / Timing** | **Priority** | **Dependency / Definition of Done** |\n| --- | --- | --- | --- | --- |"

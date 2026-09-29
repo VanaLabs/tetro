@@ -221,8 +221,6 @@ async fn get_auth_token<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
     match store.get("authToken") {
         Some(token) => {
             if let Some(token_str) = token.as_str() {
-                let truncated = token_str.chars().take(20).collect::<String>();
-                log_info!("Found auth token: {}", truncated);
                 Some(token_str.to_string())
             } else {
                 log_warn!("Auth token is not a string");
@@ -313,8 +311,7 @@ async fn make_api_request<R: Runtime, T: for<'de> Deserialize<'de>>(
     })?;
 
     // Safely truncate response for logging, respecting UTF-8 character boundaries
-    let truncated = response_text.chars().take(200).collect::<String>();
-    log_info!("Response body: {}", truncated);
+    // Provider responses may contain credentials or private meeting content.
 
     serde_json::from_str(&response_text).map_err(|e| {
         let error_msg = format!("Failed to parse JSON: {}", e);
@@ -377,8 +374,7 @@ pub async fn api_search_transcripts<R: Runtime>(
     auth_token: Option<String>,
 ) -> Result<Vec<TranscriptSearchResult>, String> {
     log_info!(
-        "api_search_transcripts called with query: '{}', auth_token: {}",
-        query,
+        "api_search_transcripts called, auth_token: {}",
         auth_token.is_some()
     );
 
@@ -393,7 +389,7 @@ pub async fn api_search_transcripts<R: Runtime>(
             Ok(results)
         }
         Err(e) => {
-            log_error!("Error searching transcripts for query '{}': {}", query, e);
+            log_error!("Error searching transcripts: {}", e);
             Err(format!("Failed to search transcripts: {}", e))
         }
     }
@@ -482,52 +478,11 @@ pub async fn api_update_profile<R: Runtime>(
 
 #[tauri::command]
 pub async fn api_get_model_config<R: Runtime>(
-    _app: AppHandle<R>,
-    state: tauri::State<'_, AppState>,
-    _auth_token: Option<String>,
+    _app: AppHandle<R>, state: tauri::State<'_, AppState>, _auth_token: Option<String>,
 ) -> Result<Option<ModelConfig>, String> {
-    log_info!("api_get_model_config called (native)");
-    let pool = state.db_manager.pool();
-
-    match SettingsRepository::get_model_config(pool).await {
-        Ok(Some(config)) => {
-            log_info!(
-                "✅ Found model config in database: provider={}, model={}, whisperModel={}, ollamaEndpoint={:?}",
-                &config.provider,
-                &config.model,
-                &config.whisper_model,
-                &config.ollama_endpoint
-            );
-            match SettingsRepository::get_api_key(pool, &config.provider).await {
-                Ok(api_key) => {
-                    log_info!("Successfully retrieved model config and API key.");
-                    Ok(Some(ModelConfig {
-                        provider: config.provider,
-                        model: config.model,
-                        whisper_model: config.whisper_model,
-                        api_key,
-                        ollama_endpoint: config.ollama_endpoint,
-                    }))
-                }
-                Err(e) => {
-                    log_error!(
-                        "Failed to get API key for provider {}: {}",
-                        &config.provider,
-                        e
-                    );
-                    Err(e.to_string())
-                }
-            }
-        }
-        Ok(None) => {
-            log_warn!("⚠️ No model config found in database - database may be empty or settings table not initialized");
-            Ok(None)
-        }
-        Err(e) => {
-            log_error!("❌ Failed to get model config from database: {}", e);
-            Err(e.to_string())
-        }
-    }
+    SettingsRepository::get_model_config(state.db_manager.pool()).await
+        .map(|config| config.map(|c| ModelConfig { provider:c.provider, model:c.model, whisper_model:c.whisper_model, api_key:None, ollama_endpoint:c.ollama_endpoint }))
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -541,6 +496,8 @@ pub async fn api_save_model_config<R: Runtime>(
     ollama_endpoint: Option<String>,
     _auth_token: Option<String>,
 ) -> Result<serde_json::Value, String> {
+    let ollama_endpoint = ollama_endpoint.filter(|s| !s.trim().is_empty())
+        .map(|s| crate::network_security::endpoint(&s)).transpose()?;
     log_info!(
         "💾 api_save_model_config called (native): provider='{}', model='{}', whisperModel='{}', ollamaEndpoint={:?}",
         &provider,
@@ -549,6 +506,18 @@ pub async fn api_save_model_config<R: Runtime>(
         &ollama_endpoint
     );
     let pool = state.db_manager.pool();
+
+    // Custom servers use their endpoint-bound credential slot. Save the key before switching models.
+    if let Some(key) = api_key {
+        if !key.is_empty() && provider != "custom-openai" {
+            log_info!("🔑 API key provided, saving...");
+            if let Err(e) = SettingsRepository::save_api_key(pool, &provider, &key).await {
+                log_error!("❌ Failed to save API key: {}", e);
+                return Err(e.to_string());
+            }
+        }
+    }
+
 
     if let Err(e) = SettingsRepository::save_model_config(
         pool,
@@ -561,17 +530,6 @@ pub async fn api_save_model_config<R: Runtime>(
     {
         log_error!("❌ Failed to save model config to database: {}", e);
         return Err(e.to_string());
-    }
-
-    // Skip API key saving for custom-openai provider (it uses customOpenAIConfig JSON instead)
-    if let Some(key) = api_key {
-        if !key.is_empty() && provider != "custom-openai" {
-            log_info!("🔑 API key provided, saving...");
-            if let Err(e) = SettingsRepository::save_api_key(pool, &provider, &key).await {
-                log_error!("❌ Failed to save API key: {}", e);
-                return Err(e.to_string());
-            }
-        }
     }
 
     // Trigger graceful shutdown of built-in AI sidecar if it's running
@@ -589,28 +547,11 @@ pub async fn api_save_model_config<R: Runtime>(
 
 #[tauri::command]
 pub async fn api_get_api_key<R: Runtime>(
-    _app: AppHandle<R>,
-    state: tauri::State<'_, AppState>,
-    provider: String,
-    _auth_token: Option<String>,
-) -> Result<String, String> {
-    log_info!(
-        "api_get_api_key called (native) for provider '{}'",
-        &provider
-    );
-    match SettingsRepository::get_api_key(&state.db_manager.pool(), &provider).await {
-        Ok(key) => {
-            log_info!(
-                "Successfully retrieved API key for provider '{}'.",
-                &provider
-            );
-            Ok(key.unwrap_or_default())
-        }
-        Err(e) => {
-            log_error!("Failed to get API key for provider '{}': {}", &provider, e);
-            Err(e.to_string())
-        }
-    }
+    _app: AppHandle<R>, state: tauri::State<'_, AppState>, provider: String, _auth_token: Option<String>,
+) -> Result<bool, String> {
+    // Compatibility command name: returns presence only, never the saved key.
+    SettingsRepository::get_api_key(state.db_manager.pool(), &provider).await
+        .map(|key| key.is_some_and(|k| !k.is_empty())).map_err(|e| e.to_string())
 }
 
 /// Saves one provider's API key without touching the selected summary model.
@@ -632,52 +573,13 @@ pub async fn api_save_api_key<R: Runtime>(
 
 #[tauri::command]
 pub async fn api_get_transcript_config<R: Runtime>(
-    _app: AppHandle<R>,
-    state: tauri::State<'_, AppState>,
-    _auth_token: Option<String>,
+    _app: AppHandle<R>, state: tauri::State<'_, AppState>, _auth_token: Option<String>,
 ) -> Result<Option<TranscriptConfig>, String> {
-    log_info!("api_get_transcript_config called (native)");
-    let pool = state.db_manager.pool();
-
-    match SettingsRepository::get_transcript_config(pool).await {
-        Ok(Some(config)) => {
-            log_info!(
-                "Found transcript config: provider={}, model={}",
-                &config.provider,
-                &config.model
-            );
-            match SettingsRepository::get_transcript_api_key(pool, &config.provider).await {
-                Ok(api_key) => {
-                    log_info!("Successfully retrieved transcript config and API key.");
-                    Ok(Some(TranscriptConfig {
-                        provider: config.provider,
-                        model: config.model,
-                        api_key,
-                    }))
-                }
-                Err(e) => {
-                    log_error!(
-                        "Failed to get transcript API key for provider {}: {}",
-                        &config.provider,
-                        e
-                    );
-                    Err(e.to_string())
-                }
-            }
-        }
-        Ok(None) => {
-            log_info!("No transcript config found, returning default.");
-            Ok(Some(TranscriptConfig {
-                provider: "parakeet".to_string(),
-                model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
-                api_key: None,
-            }))
-        }
-        Err(e) => {
-            log_error!("Failed to get transcript config: {}", e);
-            Err(e.to_string())
-        }
-    }
+    SettingsRepository::get_transcript_config(state.db_manager.pool()).await
+        .map(|config| Some(match config {
+            Some(c) => TranscriptConfig { provider:c.provider, model:c.model, api_key:None },
+            None => TranscriptConfig { provider:"parakeet".into(), model:crate::config::DEFAULT_PARAKEET_MODEL.into(), api_key:None },
+        })).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -695,11 +597,6 @@ pub async fn api_save_transcript_config<R: Runtime>(
     );
     let pool = state.db_manager.pool();
 
-    if let Err(e) = SettingsRepository::save_transcript_config(pool, &provider, &model).await {
-        log_error!("Failed to save transcript config: {}", e);
-        return Err(e.to_string());
-    }
-
     if let Some(key) = api_key {
         if !key.is_empty() {
             log_info!("API key provided, saving for transcript provider...");
@@ -711,6 +608,12 @@ pub async fn api_save_transcript_config<R: Runtime>(
         }
     }
 
+
+    if let Err(e) = SettingsRepository::save_transcript_config(pool, &provider, &model).await {
+        log_error!("Failed to save transcript config: {}", e);
+        return Err(e.to_string());
+    }
+
     log_info!("Successfully saved transcript configuration.");
     Ok(
         serde_json::json!({ "status": "success", "message": "Transcript configuration saved successfully" }),
@@ -719,32 +622,10 @@ pub async fn api_save_transcript_config<R: Runtime>(
 
 #[tauri::command]
 pub async fn api_get_transcript_api_key<R: Runtime>(
-    _app: AppHandle<R>,
-    state: tauri::State<'_, AppState>,
-    provider: String,
-    _auth_token: Option<String>,
-) -> Result<String, String> {
-    log_info!(
-        "api_get_transcript_api_key called (native) for provider '{}'",
-        &provider
-    );
-    match SettingsRepository::get_transcript_api_key(&state.db_manager.pool(), &provider).await {
-        Ok(key) => {
-            log_info!(
-                "Successfully retrieved transcript API key for provider '{}'.",
-                &provider
-            );
-            Ok(key.unwrap_or_default())
-        }
-        Err(e) => {
-            log_error!(
-                "Failed to get transcript API key for provider '{}': {}",
-                &provider,
-                e
-            );
-            Err(e.to_string())
-        }
-    }
+    _app: AppHandle<R>, state: tauri::State<'_, AppState>, provider: String, _auth_token: Option<String>,
+) -> Result<bool, String> {
+    SettingsRepository::get_transcript_api_key(state.db_manager.pool(), &provider).await
+        .map(|key| key.is_some_and(|k| !k.is_empty())).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -963,20 +844,10 @@ pub async fn api_save_transcript<R: Runtime>(
     auth_token: Option<String>,
 ) -> Result<serde_json::Value, String> {
     log_info!(
-        "api_save_transcript called for meeting: {}, transcripts: {}, folder_path: {:?}, auth_token: {}",
-        meeting_title,
+        "api_save_transcript called: transcripts: {}, auth_token: {}",
         transcripts.len(),
-        folder_path,
         auth_token.is_some()
     );
-
-    // Log first transcript for debugging
-    if let Some(first) = transcripts.first() {
-        log_debug!(
-            "First transcript data: {}",
-            serde_json::to_string_pretty(first).unwrap_or_default()
-        );
-    }
 
     // Convert serde_json::Value to TranscriptSegment
     let transcripts_to_save: Vec<TranscriptSegment> = transcripts
@@ -987,15 +858,6 @@ pub async fn api_save_transcript<R: Runtime>(
             log_error!("Failed to parse transcript segments: {}", e);
             format!("Invalid transcript data format: {}. Please check the data structure.", e)
         })?;
-
-    // Log parsed segments count and first segment details
-    if let Some(first_seg) = transcripts_to_save.first() {
-        log_debug!("First parsed segment: text='{}', audio_start_time={:?}, audio_end_time={:?}, duration={:?}",
-                   first_seg.text.chars().take(50).collect::<String>(),
-                   first_seg.audio_start_time,
-                   first_seg.audio_end_time,
-                   first_seg.duration);
-    }
 
     let pool = state.db_manager.pool();
 
@@ -1176,20 +1038,13 @@ pub async fn debug_backend_connection<R: Runtime>(app: AppHandle<R>) -> Result<S
 #[tauri::command]
 pub async fn open_external_url(url: String) -> Result<(), String> {
     use std::process::Command;
-
+    let url = crate::network_security::external_link(&url)?;
     let result = if cfg!(target_os = "windows") {
-        Command::new("cmd").args(&["/C", "start", &url]).output()
+        Command::new("rundll32.exe").arg("url.dll,FileProtocolHandler").arg(url.as_str()).status()
     } else if cfg!(target_os = "macos") {
-        Command::new("open").arg(&url).output()
-    } else {
-        // Linux and other Unix-like systems
-        Command::new("xdg-open").arg(&url).output()
-    };
-
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(format!("Failed to open URL: {}", e)),
-    }
+        Command::new("open").arg(url.as_str()).status()
+    } else { Command::new("xdg-open").arg(url.as_str()).status() };
+    match result { Ok(status) if status.success() => Ok(()), _ => Err("Could not open this link".into()) }
 }
 
 // ===== CUSTOM OPENAI API COMMANDS =====
@@ -1207,6 +1062,7 @@ pub async fn api_save_custom_openai_config<R: Runtime>(
     temperature: Option<f32>,
     top_p: Option<f32>,
 ) -> Result<serde_json::Value, String> {
+    let endpoint = crate::network_security::endpoint(&endpoint)?;
     log_info!(
         "api_save_custom_openai_config called: endpoint='{}', model='{}'",
         &endpoint,
@@ -1245,7 +1101,7 @@ pub async fn api_save_custom_openai_config<R: Runtime>(
 
     let config = CustomOpenAIConfig {
         endpoint: endpoint.trim().to_string(),
-        api_key: api_key.filter(|k| !k.trim().is_empty()),
+        api_key: api_key.map(|k| k.trim().to_string()),
         model: model.trim().to_string(),
         max_tokens,
         temperature,
@@ -1272,28 +1128,15 @@ pub async fn api_save_custom_openai_config<R: Runtime>(
 /// Gets the custom OpenAI configuration
 #[tauri::command]
 pub async fn api_get_custom_openai_config<R: Runtime>(
-    _app: AppHandle<R>,
-    state: tauri::State<'_, AppState>,
-) -> Result<Option<CustomOpenAIConfig>, String> {
-    log_info!("api_get_custom_openai_config called");
-
-    let pool = state.db_manager.pool();
-
-    match SettingsRepository::get_custom_openai_config(pool).await {
-        Ok(config) => {
-            if let Some(ref c) = config {
-                log_info!("✅ Found custom OpenAI config: endpoint='{}', model='{}'",
-                    c.endpoint, c.model);
-            } else {
-                log_info!("No custom OpenAI config found");
-            }
-            Ok(config)
-        }
-        Err(e) => {
-            log_error!("❌ Failed to get custom OpenAI config: {}", e);
-            Err(format!("Failed to get custom OpenAI configuration: {}", e))
-        }
-    }
+    _app: AppHandle<R>, state: tauri::State<'_, AppState>,
+) -> Result<Option<serde_json::Value>, String> {
+    let config = SettingsRepository::get_custom_openai_config(state.db_manager.pool()).await.map_err(|e| e.to_string())?;
+    config.map(|mut c| {
+        let has_key = c.api_key.take().is_some_and(|key| !key.is_empty());
+        let mut public = serde_json::to_value(c).map_err(|_| "Could not read provider configuration".to_string())?;
+        public["hasApiKey"] = serde_json::Value::Bool(has_key);
+        Ok(public)
+    }).transpose()
 }
 
 /// Tests the connection to a custom OpenAI-compatible endpoint
@@ -1301,10 +1144,16 @@ pub async fn api_get_custom_openai_config<R: Runtime>(
 #[tauri::command]
 pub async fn api_test_custom_openai_connection<R: Runtime>(
     _app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
     endpoint: String,
     api_key: Option<String>,
     model: String,
 ) -> Result<serde_json::Value, String> {
+    let endpoint = crate::network_security::endpoint(&endpoint)?;
+    let api_key = match api_key {
+        Some(key) => Some(key),
+        None => crate::credentials::read(state.db_manager.pool(), crate::credentials::Slot::custom(&endpoint)).await.map_err(|e| e.to_string())?,
+    };
     log_info!(
         "api_test_custom_openai_connection called: endpoint='{}', model='{}'",
         &endpoint,
@@ -1332,6 +1181,7 @@ pub async fn api_test_custom_openai_connection<R: Runtime>(
     });
 
     let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
@@ -1384,17 +1234,17 @@ pub async fn api_test_custom_openai_connection<R: Runtime>(
                         }
 
                         // Response was 200 but doesn't match OpenAI format
-                        log_warn!("⚠️ Endpoint returned 200 but response doesn't match OpenAI format: {}", response_text);
+                        log_warn!("Endpoint returned a response that does not match the expected format");
                         Err("Endpoint is reachable but doesn't appear to be OpenAI-compatible. Response is missing 'choices' array or 'message.content' / 'message.reasoning_content' field.".to_string())
                     }
                     Err(e) => {
                         log_warn!("⚠️ Endpoint returned 200 but response is not valid JSON: {}", e);
-                        Err(format!("Endpoint is reachable but returned invalid JSON: {}. Response: {}", e, response_text))
+                        Err("Endpoint is reachable but returned invalid JSON".to_string())
                     }
                 }
             } else {
-                log_warn!("⚠️ Custom OpenAI connection test failed with status {}: {}", status, response_text);
-                Err(format!("Connection failed with status {}: {}", status, response_text))
+                log_warn!("Custom server connection test failed with status {}", status);
+                Err(format!("Connection failed with status {}. Check your server and API key.", status))
             }
         }
         Err(e) => {

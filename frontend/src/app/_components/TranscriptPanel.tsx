@@ -18,7 +18,7 @@ import { useMemo } from 'react';
 import { isPrimaryLanguageSelectionAvailable } from '@/lib/transcription-language-routing';
 import { recordingLanguageLabel } from '@/lib/recording-setup';
 
-const whisperLabel = (model: string) => { const name = getWhisperDisplayName(model); return /armenian/i.test(name) ? name : `Whisper ${name}`; };
+const whisperLabel = (model: string) => { return getWhisperDisplayName(model).replace(/ · standard$/, '').replace(/ · /g, ' '); };
 
 /**
  * TranscriptPanel Component
@@ -69,8 +69,8 @@ export function TranscriptPanel({
   return <div ref={transcriptContainerRef} className="tetro-home-panel tetro-sheet">
     <div className="tetro-pane-toolbar tetro-live-toolbar"><span>{transcripts.length ? `${transcripts.length} ${transcripts.length === 1 ? 'line' : 'lines'} so far` : isRecording ? (isPaused ? 'Paused' : 'Listening…') : 'New recording'}</span>
       {transcripts.length > 0 && <Button variant="outline" size="sm" onClick={copyTranscript} title="Copy transcript"><Copy />Copy</Button>}
-      {isPrimaryLanguageSelectionAvailable(transcriptModelConfig.provider) && <Button variant="outline" size="sm" onClick={() => showModal('languageSettings')} title="Transcription language"><GlobeIcon />Language</Button>}
-      <Button variant="outline" size="sm" onClick={() => showModal('modelSelector')} title="Transcription model"><SlidersHorizontal />{transcriptModelConfig.provider === 'parakeet' ? getModelDisplayName(transcriptModelConfig.model) : transcriptModelConfig.model ? whisperLabel(transcriptModelConfig.model) : 'Choose model'}</Button>
+      {(isRecording || transcripts.length > 0) && <>{isPrimaryLanguageSelectionAvailable(transcriptModelConfig.provider) && <Button variant="outline" size="sm" onClick={() => showModal('languageSettings')} title="Transcription language"><GlobeIcon />Language</Button>}
+      <Button variant="outline" size="sm" onClick={() => showModal('modelSelector')} title="Transcription model"><SlidersHorizontal />{transcriptModelConfig.provider === 'parakeet' ? getModelDisplayName(transcriptModelConfig.model) : transcriptModelConfig.model ? whisperLabel(transcriptModelConfig.model) : 'Choose model'}</Button></>}
       <Button variant="outline" size="sm" onClick={() => showModal('deviceSettings')} title="Microphone and system audio"><AudioLines />Audio</Button>
     </div>
     {!isRecording && transcripts.length === 0 && <SetupGuide onChooseTranscription={() => showModal('modelSelector')} />}

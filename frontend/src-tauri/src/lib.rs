@@ -36,6 +36,9 @@ pub(crate) use perf_trace;
 
 // Declare audio module
 pub mod app_profile;
+pub mod credentials;
+pub mod app_permissions;
+pub mod network_security;
 mod app_menu;
 mod startup;
 pub mod api;
@@ -539,6 +542,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(whisper_engine::parallel_commands::ParallelProcessorState::new())
         .manage(Arc::new(RwLock::new(
             None::<notifications::manager::NotificationManager<tauri::Wry>>,
@@ -754,6 +758,11 @@ pub fn run() {
             whisper_engine::parallel_commands::test_parallel_processing_setup,
             get_audio_devices,
             trigger_microphone_permission,
+            app_permissions::get_app_permissions,
+            app_permissions::request_app_permission,
+            app_permissions::open_app_permission_settings,
+            app_permissions::test_system_audio_access,
+            app_permissions::check_saved_key_access,
             start_recording_with_devices,
             start_recording_with_devices_and_meeting,
             start_audio_level_monitoring,

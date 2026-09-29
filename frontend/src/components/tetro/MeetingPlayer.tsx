@@ -39,7 +39,7 @@ export function PlaybackProvider({ meetingId, children }: { meetingId?: string; 
     let cancelled = false;
     invoke<string | null>('api_meeting_audio_path', { meetingId })
       .then(path => { if (!cancelled && path) setSrc(convertFileSrc(path)); })
-      .catch(() => { if (!cancelled) setAudioError('Couldn’t open the recording. Your transcript and notes are still available.'); });
+      .catch(() => { if (!cancelled) setAudioError('Couldn’t open the recording. Your transcript and summary are still available.'); });
     return () => { cancelled = true; };
   }, [meetingId, retry]);
 
@@ -58,7 +58,7 @@ export function PlaybackProvider({ meetingId, children }: { meetingId?: string; 
 
   return <PlaybackContext.Provider value={value}>
     {children}
-    {audioError && <div className="tetro-player-error" role="alert"><span>{audioError}</span><button className="tetro-link" onClick={() => setRetry(n => n + 1)}>Try again</button><button className="tetro-link" onClick={() => { void invoke('open_meeting_folder', { meetingId }).catch(() => setAudioError('The recording folder is unavailable. The audio may have been moved or deleted; your transcript and notes are safe.')); }}>Open recording folder</button></div>}
+    {audioError && <div className="tetro-player-error" role="alert"><span>{audioError}</span><button className="tetro-link" onClick={() => setRetry(n => n + 1)}>Try again</button><button className="tetro-link" onClick={() => { void invoke('open_meeting_folder', { meetingId }).catch(() => setAudioError('The recording folder is unavailable. The audio may have been moved or deleted; your transcript and summary are safe.')); }}>Open recording folder</button></div>}
     {src && !failed && <div className="tetro-player" role="group" aria-label="Recording playback">
       <audio ref={audio} src={src} preload="metadata"
         onTimeUpdate={e => setTime(e.currentTarget.currentTime)}

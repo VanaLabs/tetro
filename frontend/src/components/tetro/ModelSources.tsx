@@ -123,7 +123,7 @@ export function OllamaModels() {
       ))}
       {models && !models.length && !downloading.length && <p className="tetro-setting-note">No Ollama models yet.</p>}
       <form className="tetro-key-form tetro-ollama-add" onSubmit={e => { e.preventDefault(); void pull(); }}>
-        <Input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Model name, e.g. gemma3:4b" aria-label="Ollama model to download" spellCheck={false} />
+        <Input value={draft} onChange={e => setDraft(e.target.value)} placeholder="Model name, e.g. qwen3.5:2b" aria-label="Ollama model to download" spellCheck={false} />
         <button type="submit" className="tetro-key" disabled={!draft.trim() || pulling}>{pulling ? 'Downloading…' : 'Download and use'}</button>
       </form>
     </div>}
@@ -138,7 +138,7 @@ export function OllamaModels() {
   </>;
 }
 
-type CustomConfig = { endpoint?: string; model?: string; apiKey?: string | null; maxTokens?: number | null; temperature?: number | null; topP?: number | null; displayName?: string | null };
+type CustomConfig = { endpoint?: string; model?: string; hasApiKey?: boolean; maxTokens?: number | null; temperature?: number | null; topP?: number | null; displayName?: string | null };
 
 /** Any OpenAI-compatible server: address, model name and optional key, with a connection test. */
 export function CustomServer() {
@@ -150,7 +150,7 @@ export function CustomServer() {
   useEffect(() => {
     invoke<CustomConfig | null>('api_get_custom_openai_config').then(c => {
       setSaved(c?.endpoint ? c : null);
-      setForm({ endpoint: c?.endpoint || '', model: c?.model || '', apiKey: c?.apiKey || '' });
+      setForm({ endpoint: c?.endpoint || '', model: c?.model || '', apiKey: '' });
     }).catch(() => setSaved(null));
   }, []);
 
@@ -170,7 +170,8 @@ export function CustomServer() {
     try {
       const next = { ...args(), maxTokens: saved?.maxTokens ?? null, temperature: saved?.temperature ?? null, topP: saved?.topP ?? null };
       await invoke('api_save_custom_openai_config', next);
-      setSaved(next); setEditing(false);
+      const stored = await invoke<CustomConfig | null>('api_get_custom_openai_config');
+      setSaved(stored); setForm({ endpoint: stored?.endpoint || next.endpoint, model: stored?.model || next.model, apiKey: '' }); setEditing(false);
     } catch (e) {
       toast.error('Couldn’t save the custom server', { description: String(e) });
     } finally { setBusy(null); }
@@ -199,11 +200,11 @@ export function CustomServer() {
     <form className="tetro-custom-server" onSubmit={e => { e.preventDefault(); if (valid) void save(); }}>
       <Input value={form.endpoint} onChange={e => setForm({ ...form, endpoint: e.target.value })} placeholder="Address, e.g. http://localhost:8000/v1" aria-label="Server address" spellCheck={false} />
       <Input value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="Model name" aria-label="Model name" spellCheck={false} />
-      <Input type="password" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })} placeholder="API key (optional)" aria-label="API key" autoComplete="off" />
+      <Input type="password" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })} placeholder={saved?.hasApiKey && form.endpoint.trim().replace(/\/$/, '') === saved.endpoint?.replace(/\/$/, '') ? "Key saved; leave blank to keep it" : "API key (optional)"} aria-label="API key" autoComplete="off" />
       <div className="tetro-custom-server-actions">
         <button type="button" className="tetro-key" disabled={!valid || !!busy} onClick={test}>{busy === 'test' ? 'Testing…' : 'Test'}</button>
         <button type="submit" className="tetro-key" disabled={!valid || !!busy}>{busy === 'save' ? 'Saving…' : 'Save'}</button>
-        {editing && <button type="button" className="tetro-key" onClick={() => setEditing(false)}>Cancel</button>}
+        {editing && <button type="button" className="tetro-key" onClick={() => { setEditing(false); setForm({ endpoint: saved?.endpoint || '', model: saved?.model || '', apiKey: '' }); }}>Cancel</button>}
       </div>
     </form>
   </div>;

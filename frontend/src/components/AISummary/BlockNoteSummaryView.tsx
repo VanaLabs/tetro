@@ -86,7 +86,7 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
         setBlocks([...editor.document]);
         if (restored?.length) { setDirty(true); setMessage('Your unfinished edits are here.'); }
         loaded.current = true;
-      } catch { setMessage('These notes could not be opened. Your saved copy is unchanged.'); }
+      } catch { setMessage('This summary could not be opened. Your saved copy is unchanged.'); }
     };
     void load();
     return () => { cancelled = true; };
@@ -141,8 +141,8 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
   }, [blocks, edits, isDirty]);
 
   const getMarkdown = useCallback(async () => {
-    const result = await blocksToMarkdownSafely(editor, editor.document, { source: 'Tetro notes editor' });
-    if (!result.ok || result.markdown === undefined) throw new Error('Could not prepare these notes. Your edits are still here; please try again.');
+    const result = await blocksToMarkdownSafely(editor, editor.document, { source: 'Tetro summary editor' });
+    if (!result.ok || result.markdown === undefined) throw new Error('Could not prepare this summary. Your edits are still here; please try again.');
     return result.markdown;
   }, [editor]);
   const save = useCallback(async () => {

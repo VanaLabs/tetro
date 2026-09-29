@@ -14,7 +14,7 @@ export function ModelActivationBridge() {
     let disposed = false;
     const off: (() => void)[] = [];
     const complete = async (provider: LocalModelProvider, model: string) => {
-      try { if (await activateDownloadedModel(provider, model)) toast.success(provider === 'builtin-ai' ? 'Ready to write notes' : 'Ready to transcribe', { description: `${model} is now in use.` }); }
+      try { if (await activateDownloadedModel(provider, model)) toast.success(provider === 'builtin-ai' ? 'Ready to write summaries' : 'Ready to transcribe', { description: `${model} is now in use.` }); }
       catch (error) { toast.error('Downloaded, but couldn’t switch models', { description: 'Your previous model is still selected. Choose Use to try again.' }); }
     };
     const add = async <T,>(name: string, callback: (payload: T) => void) => {
@@ -27,6 +27,9 @@ export function ModelActivationBridge() {
       add<{ model: string; status: string }>('builtin-ai-download-progress', e => {
         if (e.status === 'completed') void complete('builtin-ai', e.model);
         if (e.status === 'cancelled' || e.status === 'error') cancelModelActivation('builtin-ai', e.model);
+      }),
+      add<{ error: string }>('builtin-ai-model-selection-error', e => {
+        toast.error('Summary downloaded, but couldn’t be selected', { description: e.error });
       }),
     ]).catch(() => toast.error('Couldn’t watch model downloads', { description: 'After downloading, choose Use in Models.' }));
     return () => { disposed = true; off.forEach(fn => fn()); window.removeEventListener(TRANSCRIBER_CHANGED, changed); };

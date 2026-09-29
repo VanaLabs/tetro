@@ -186,7 +186,7 @@ pub async fn complete_onboarding<R: Runtime>(
     model: String,
     summary_ready: bool,
 ) -> Result<(), String> {
-    info!("Completing onboarding with builtin-ai model: {}", model);
+    info!("Completing onboarding; summary model ready: {}", summary_ready);
 
     crate::whisper_engine::commands::whisper_init().await?;
     let tiny_ready = crate::whisper_engine::commands::whisper_get_available_models().await?
@@ -199,29 +199,34 @@ pub async fn complete_onboarding<R: Runtime>(
     // Step 1: Save model configuration to SQLite database FIRST
     let pool = state.db_manager.pool();
 
-    // Onboarding always uses builtin-ai (local LLM)
-    if let Err(e) = SettingsRepository::save_model_config(
-        pool,
-        "builtin-ai",
-        &model,
-        "tiny",
-        None,
-    ).await {
-        error!("Failed to save builtin-ai model config: {}", e);
-        return Err(format!("Failed to save builtin-ai model config: {}", e));
+    // A download may finish between the readiness check and this write. Never
+    // replace its selection (or a newer explicit choice) with an empty model.
+    if summary_ready {
+        SettingsRepository::select_summary_model_if_unselected(pool, &model)
+            .await
+            .map_err(|e| format!("Failed to select summary model: {}", e))?;
+    } else {
+        SettingsRepository::ensure_unselected_summary_config(pool)
+            .await
+            .map_err(|e| format!("Failed to initialize summary model choice: {}", e))?;
     }
-    info!("Saved builtin-ai model config: model={}", model);
+    info!("Saved summary model config; ready={}", summary_ready);
 
-    // Use the bundled small speech model until the person chooses another one.
-    if let Err(e) = SettingsRepository::save_transcript_config(
-        pool,
-        "localWhisper",
-        "tiny",
-    ).await {
+    // The recommended download may already be selected by the frontend bridge.
+    // Prefer it when ready, and atomically preserve any selection made meanwhile.
+    let parakeet_ready = match crate::parakeet_engine::commands::parakeet_init().await {
+        Ok(()) => crate::parakeet_engine::commands::parakeet_get_available_models().await
+            .map(|models| models.into_iter().any(|entry|
+                entry.name == "stt-parakeet-multilingual"
+                    && matches!(entry.status, crate::parakeet_engine::ModelStatus::Available)))
+            .unwrap_or_else(|error| { warn!("Could not check optional Parakeet model: {}", error); false }),
+        Err(error) => { warn!("Could not initialize optional Parakeet model: {}", error); false }
+    };
+    if let Err(e) = SettingsRepository::initialize_onboarding_transcript_config(pool, parakeet_ready).await {
         error!("Failed to save transcription model config: {}", e);
         return Err(format!("Failed to save transcription model config: {}", e));
     }
-    info!("Saved transcription model config: provider=localWhisper, model=tiny");
+    info!("Initialized transcription model config; Parakeet ready={}", parakeet_ready);
 
     // Step 2: Only NOW mark onboarding as complete (after DB operations succeed)
     let mut status = load_onboarding_status(&app)
@@ -229,7 +234,7 @@ pub async fn complete_onboarding<R: Runtime>(
         .map_err(|e| format!("Failed to load onboarding status: {}", e))?;
 
     status.completed = true;
-    status.current_step = 4; // Max step (4 on macOS with permissions, 3 on other platforms)
+    status.current_step = 3;
     status.model_status.transcription = Some("downloaded".to_string());
     status.model_status.summary = if summary_ready { "downloaded" } else { "not_downloaded" }.to_string();
     status.model_status.selected_summary_model = Some(model.clone());

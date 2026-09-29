@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Represents a single section in a meeting template
+/// Represents a single section in a summary template
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemplateSection {
     /// Section title (e.g., "Summary", "Action Items")
@@ -21,7 +21,7 @@ pub struct TemplateSection {
     pub example_item_format: Option<String>,
 }
 
-/// Represents a complete meeting template
+/// Represents a complete summary template
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Template {
     /// Template display name
@@ -84,7 +84,7 @@ impl Template {
     /// Generates section-specific instructions for the LLM
     pub fn to_section_instructions(&self) -> String {
         let mut instructions = String::from(
-            "Include every requested section. Use only information stated in the transcript. Do not invent people, dates, diagnoses, decisions or tasks. If a section was not discussed, say Not discussed briefly.\n- **For the main title (`# [AI-Generated Title]`):** Create a concise, descriptive meeting title.\n"
+            "Use only the transcript for facts. Template headings, instructions and formatting examples are not evidence: never import their names, events or assumptions into the summary. If a section asks for an opinion or suggestion, label it as an impression and ground it in specific recorded content. Omit sections without relevant content instead of adding placeholders.\n- **For the main title (`# [AI-Generated Title]`):** Use a plain title supported by the recorded words. Do not infer an occasion from a greeting.\n"
         );
 
         for section in &self.sections {
@@ -101,7 +101,7 @@ impl Template {
                 let layout = match section.format.as_str() {
                     "list" => "Use a bullet list, one point per bullet",
                     "string" => "Use one short line",
-                    _ => "Use a concise paragraph",
+                    _ => "Use clear prose, with length appropriate to the content",
                 };
                 instructions.push_str(&format!("  - {}.\n", layout));
             }

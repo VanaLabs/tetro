@@ -1,27 +1,31 @@
 {
-  "name": "Standard Meeting Notes",
-  "description": "A standard template for general meetings, focusing on key outcomes and actions.",
+  "name": "General Summary",
+  "description": "A flexible summary for any meeting or recording that does not need a specific template.",
   "sections": [
     {
       "title": "Summary",
-      "instruction": "Provide a brief, one-paragraph executive summary of the entire meeting.",
+      "instruction": "Summarize the recording clearly and faithfully. Lead with what matters most, then cover important context and details. Choose a length that fits the content, preserve uncertainty, and do not invent facts or use tables.",
       "format": "paragraph"
     },
     {
-      "title": "Key Decisions",
-      "instruction": "List the most important decisions made during the meeting.",
+      "title": "Key Points",
+      "instruction": "Capture the most useful topics, ideas, details, or outcomes as short bullets. Follow the substance of the recording rather than forcing a meeting agenda; avoid repeating the Summary.",
+      "format": "list"
+    },
+    {
+      "title": "Decisions",
+      "instruction": "Include only decisions explicitly made in the recording. Omit this section when no decision was made.",
       "format": "list"
     },
     {
       "title": "Action Items",
-      "instruction": "List only tasks explicitly assigned or agreed in the conversation. Keep owners and due dates exactly as stated; use an em dash when either was not stated. Do not turn a discussion topic into a new task. Do not invent deadlines or timestamps. If no tasks were assigned, omit the table and write only: No tasks were assigned. Otherwise show the table without that sentence.",
-      "format": "list",
-      "item_format": "| Owner | Task | Due |\n| --- | --- | --- |"
+      "instruction": "Use plain bullets for tasks explicitly agreed, assigned, requested, or committed to. Include an owner or due date only when stated. Do not turn a suggestion or topic into a task; omit this section when there are no clear actions, and never use a table.",
+      "format": "list"
     },
     {
-      "title": "Discussion Highlights",
-      "instruction": "Summarize the main topics of discussion, key arguments, and important insights.",
-      "format": "paragraph"
+      "title": "Open Questions",
+      "instruction": "List important questions left unresolved in the recording. Omit this section when there are none.",
+      "format": "list"
     }
   ]
 }

@@ -40,16 +40,16 @@ export function MeetingVersions({ meetingId, kind, onRestored, canRestore = true
       textUpdated(meetingId); await onRestored?.(); setOpen(false);
     } catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
-  return <>{!hideTrigger && <Button size="sm" variant="outline" title="Previous versions" aria-label={`Previous ${kind === 'summary' ? 'notes' : 'transcript'} versions`} onClick={() => setOpen(true)}><History size={16} /></Button>}
+  return <>{!hideTrigger && <Button size="sm" variant="outline" title="Previous versions" aria-label={`Previous ${kind === 'summary' ? 'summary' : 'transcript'} versions`} onClick={() => setOpen(true)}><History size={16} /></Button>}
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}><DialogContent className="tetro-versions" onCloseAutoFocus={event => { if (returnFocus) { event.preventDefault(); returnFocus(); } }}>
-      <DialogTitle>Previous {kind === 'summary' ? 'notes' : 'transcripts'}</DialogTitle>
+      <DialogTitle>Previous {kind === 'summary' ? 'summaries' : 'transcripts'}</DialogTitle>
       <DialogDescription>Preview an earlier version before restoring it. Your current text is kept as another version. Audio and important moments stay in place.</DialogDescription>
       {error && <p role="alert">{error}</p>}
       {loading ? <p role="status">Loading versions…</p> : !versions.length ? <p>No previous versions yet. Tetro keeps one when you edit or try again.</p> : <div className="tetro-version-grid">
         <div className="tetro-version-list">{versions.map(v => <button key={v.id} aria-pressed={selected?.id === v.id} disabled={busy} onClick={() => setSelected(v)}><b>{v.label}</b><small>{new Date(v.created_at).toLocaleString()}</small></button>)}</div>
         <pre className="tetro-version-preview">{selected ? preview : 'Choose a version to preview it.'}</pre>
       </div>}
-      {selected?.kind === 'correction' && <p>This correction changed both the transcript and notes. Restoring it brings both back.</p>}
+      {selected?.kind === 'correction' && <p>This correction changed both the transcript and summary. Restoring it brings both back.</p>}
       {!canRestore && <p>Save or cancel your current edits before restoring a version.</p>}
       <div className="tetro-dialog-actions"><button disabled={busy} onClick={() => setOpen(false)}>Cancel</button><button className="tetro-key tetro-key-amber" disabled={!canRestore || !selected || busy || preview === 'Loading…'} onClick={() => void restore()}>{busy ? 'Restoring…' : 'Restore version'}</button></div>
     </DialogContent></Dialog></>;

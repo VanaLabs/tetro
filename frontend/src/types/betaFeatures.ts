@@ -35,7 +35,7 @@ export const DEFAULT_BETA_FEATURES: BetaFeatures = {
  * Human-readable feature names for UI display
  */
 export const BETA_FEATURE_NAMES: Record<keyof BetaFeatures, string> = {
-  importAndRetranscribe: 'Import Audio & Retranscribe',
+  importAndRetranscribe: 'Import audio & retranscribe',
   speakerLabels: 'Speaker labels',
 };
 
@@ -44,7 +44,7 @@ export const BETA_FEATURE_NAMES: Record<keyof BetaFeatures, string> = {
  */
 export const BETA_FEATURE_DESCRIPTIONS: Record<keyof BetaFeatures, string> = {
   importAndRetranscribe: 'Import audio files to transcribe or retranscribe existing meetings with different language settings.',
-  speakerLabels: 'Suggest who said each line from the transcript, using your notes model. This does not identify voices. Check the labels and rename speakers where needed.',
+  speakerLabels: 'Suggest who said each line from the transcript, using your summary model. This does not identify voices. Check the labels and rename speakers where needed.',
 };
 
 /**

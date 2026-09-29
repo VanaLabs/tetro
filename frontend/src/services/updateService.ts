@@ -1,11 +1,4 @@
-/**
- * Update Service
- *
- * Handles automatic software updates using Tauri updater plugin.
- * Provides update checking, downloading, and installation functionality.
- */
-
-import type { Update } from '@tauri-apps/plugin-updater';
+import { check, type Update } from '@tauri-apps/plugin-updater';
 import { getVersion } from '@tauri-apps/api/app';
 
 export interface UpdateInfo {
@@ -14,30 +7,57 @@ export interface UpdateInfo {
   version?: string;
   date?: string;
   body?: string;
-  downloadUrl?: string;
 }
-
 export interface UpdateProgress {
   downloaded: number;
   total: number;
   percentage: number;
 }
 
-/**
- * Update Service
- * Singleton service for managing app updates
- */
 export class UpdateService {
-  // A Tetro release channel must be configured before packaged updates are enabled.
-  async checkForUpdates(_force = false): Promise<UpdateInfo> {
-    return { available: false, currentVersion: await getVersion(), body: 'Automatic updates are not available for this Tetro build.' };
-  }
-  async downloadAndInstall(_update: Update, _onProgress?: (progress: UpdateProgress) => void): Promise<void> {
-    throw new Error('Tetro has no signed update channel configured yet.');
-  }
-  async getCurrentVersion(): Promise<string> { return getVersion(); }
-  wasCheckedRecently(): boolean { return true; }
-}
+  private lastChecked = 0;
+  private pending: Promise<UpdateInfo> | null = null;
+  private info: UpdateInfo | null = null;
+  private update: Update | null = null;
+  private claimed = new WeakSet<Update>();
 
-// Export singleton instance
+  wasCheckedRecently(): boolean {
+    return this.lastChecked > 0 && Date.now() - this.lastChecked < 6 * 60 * 60 * 1000;
+  }
+
+  async checkForUpdates(force = false): Promise<UpdateInfo> {
+    if (this.pending) return this.pending;
+    if (!force && this.wasCheckedRecently() && this.info) return this.info;
+    this.pending = this.performCheck();
+    try { return await this.pending; } finally { this.pending = null; }
+  }
+
+  private async performCheck(): Promise<UpdateInfo> {
+    const currentVersion = await getVersion();
+    const next = await check({ timeout: 15000 });
+    const previous = this.update;
+    // A dialog may already hold downloaded bytes on this resource. Keep it alive
+    // across periodic checks, and reuse it when the release has not changed.
+    if (next && previous?.version === next.version) {
+      await next.close().catch(() => {});
+      this.update = previous;
+    } else {
+      this.update = next;
+      if (previous && !this.claimed.has(previous)) await previous.close().catch(() => {});
+    }
+    this.info = next
+      ? { available: true, currentVersion, version: next.version, date: next.date, body: next.body }
+      : { available: false, currentVersion };
+    this.lastChecked = Date.now();
+    return this.info;
+  }
+
+  getUpdate(version?: string): Update {
+    if (!this.update || this.update.version !== version) {
+      throw new Error('Please check for updates again before downloading.');
+    }
+    this.claimed.add(this.update);
+    return this.update;
+  }
+}
 export const updateService = new UpdateService();

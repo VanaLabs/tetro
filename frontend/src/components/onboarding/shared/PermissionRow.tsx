@@ -1,79 +1,39 @@
 import React from 'react';
-import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { PermissionRowProps } from '@/types/onboarding';
+import styles from './PermissionRow.module.css';
 
-export function PermissionRow({ icon, title, description, status, isPending = false, onAction }: PermissionRowProps) {
+export function PermissionRow({ icon, title, description, status, isPending = false, disabled = false, actionLabel, onAction }: PermissionRowProps) {
   const isAuthorized = status === 'authorized';
   const isDenied = status === 'denied';
-  const isChecking = isPending;
-
-  const getButtonText = () => {
-    if (isChecking) return 'Checking...';
-    if (isDenied) return 'Open Settings';
-    return 'Enable';
-  };
+  const buttonText = isPending ? 'Checking...' : isDenied ? 'Open Settings' : actionLabel || 'Enable';
 
   return (
-    <div
-      className={cn(
-        'flex items-center justify-between rounded-2xl border px-6 py-5',
-        'transition-all duration-200',
-        isAuthorized ? 'border-gray-900 bg-gray-100' : isDenied ? 'border-red-300 bg-red-50' : 'bg-white border-neutral-200'
-      )}
-    >
-      {/* Left side: Icon + Info */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        {/* Icon */}
-        <div
-          className={cn(
-            'flex size-10 items-center justify-center rounded-full flex-shrink-0',
-            isAuthorized ? 'bg-gray-200' : isDenied ? 'bg-red-100' : 'bg-neutral-50'
-          )}
-        >
-          <div className={cn(isAuthorized ? 'text-gray-900' : isDenied ? 'text-red-500' : 'text-neutral-500')}>{icon}</div>
-        </div>
-
-        {/* Title + Description */}
-        <div className="min-w-0 flex-1">
-          <div className="font-medium truncate text-neutral-900">{title}</div>
-          <div className="text-sm text-muted-foreground">
-            {isAuthorized ? (
-              <span className="text-green-600 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Access Granted
-              </span>
-            ) : isDenied ? (
-              <span className="text-red-500 flex items-center gap-1">
-                <XCircle className="w-3.5 h-3.5" />
-                Access Denied - Please grant in System Settings
-              </span>
-            ) : (
-              <span>{description}</span>
-            )}
+    <div className={styles.row} data-authorized={isAuthorized || undefined} data-denied={isDenied || undefined}>
+      <div className={styles.details}>
+        <span className={styles.icon} aria-hidden="true">{icon}</span>
+        <div className={styles.copy}>
+          <div className={styles.title}>{title}</div>
+          <div className={styles.description}>
+            {isAuthorized ? 'Access Granted' : isDenied ? 'Access Denied - Please grant in System Settings' : description}
           </div>
         </div>
       </div>
-
-      {/* Right side: Action button or checkmark */}
-      <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-        {!isAuthorized && (
+      <div className={styles.action}>
+        {isAuthorized ? (
+          <span className={styles.confirmed} aria-hidden="true"><Check strokeWidth={2} /></span>
+        ) : (
           <Button
-            variant={isDenied ? "destructive" : "outline"}
+            variant={isDenied ? 'destructive' : 'outline'}
             size="sm"
             onClick={onAction}
-            disabled={isChecking}
+            disabled={disabled || isPending}
             className="min-w-[100px]"
           >
-            {isChecking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {getButtonText()}
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+            {buttonText}
           </Button>
-        )}
-        {isAuthorized && (
-          <div className="flex size-8 items-center justify-center rounded-full bg-green-100">
-            <CheckCircle2 className="w-4 h-4 text-green-600" />
-          </div>
         )}
       </div>
     </div>

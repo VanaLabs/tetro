@@ -1,5 +1,6 @@
 import React from 'react';
-import { Check, Lock, Download, CheckCircle2, BrainCircuit } from 'lucide-react';
+import { Check, Cpu, House, Mic } from 'lucide-react';
+import styles from './ProgressIndicator.module.css';
 
 interface ProgressIndicatorProps {
   current: number;
@@ -7,62 +8,33 @@ interface ProgressIndicatorProps {
   onStepClick?: (step: number) => void;
 }
 
-const stepIcons = [
-  Lock,         // 1. Welcome
-  BrainCircuit, // 2. Setup Overview
-  Download,     // 3. Download Progress
-  // Step 4 (Permissions) doesn't need icon - auto-skipped on non-macOS
+// Each step is a small hardware key, like the recorder keys: the current step is
+// latched down with its LED lit, finished steps show a check, later steps sit idle.
+const steps = [
+  { label: 'Welcome', icon: House },
+  { label: 'Choose models', icon: Cpu },
+  { label: 'Permissions', icon: Mic },
 ];
 
 export function ProgressIndicator({ current, total, onStepClick }: ProgressIndicatorProps) {
-  const visibleSteps = Array.from({ length: total }, (_, i) => i + 1);
-
-  return (
-    <div className="mb-8">
-      <div className="flex items-center justify-center gap-2">
-        {visibleSteps.map((step, index) => {
-          const isActive = step === current;
-          const isCompleted = step < current;
-          const isClickable = isCompleted && onStepClick;
-          const StepIcon = stepIcons[step - 1] || CheckCircle2;
-
-          return (
-            <React.Fragment key={step}>
-              {/* Step Circle */}
-              <button
-                onClick={() => isClickable && onStepClick(step)}
-                disabled={!isClickable}
-                className={`relative flex items-center justify-center transition-all duration-300 ${
-                  isCompleted
-                    ? 'w-7 h-7 bg-green-600 rounded-full'
-                    : isActive
-                      ? 'w-8 h-8 bg-blue-500 rounded-full'
-                      : 'w-6 h-6 bg-gray-300 rounded-full'
-                } ${isClickable ? 'cursor-pointer hover:scale-110 hover:shadow-md' : 'cursor-default'}`}
-              >
-                {isCompleted ? (
-                  <Check className="w-4 h-4 text-white" />
-                ) : (
-                  <StepIcon
-                    className={`transition-all duration-300 ${
-                      isActive ? 'w-4 h-4 text-white' : 'w-3 h-3 text-gray-600'
-                    }`}
-                  />
-                )}
-              </button>
-
-              {/* Connector Line */}
-              {index < visibleSteps.length - 1 && (
-                <div
-                  className={`h-0.5 w-6 transition-all duration-300 ${
-                    isCompleted ? 'bg-green-600' : 'bg-gray-300'
-                  }`}
-                />
-              )}
-            </React.Fragment>
-          );
-        })}
-      </div>
-    </div>
-  );
+  return <nav className={styles.track} aria-label="Setup progress">
+    {steps.slice(0, total).map(({ label, icon: Icon }, index) => {
+      const step = index + 1;
+      const completed = step < current;
+      const active = step === current;
+      const clickable = completed && Boolean(onStepClick);
+      return <React.Fragment key={label}>
+        {index > 0 && <span aria-hidden="true" className={styles.connector} data-complete={completed || active || undefined} />}
+        <button type="button" className={styles.step} data-active={active || undefined} data-complete={completed || undefined}
+          aria-current={active ? 'step' : undefined} aria-label={clickable ? `Back to ${label}, completed` : completed ? `${label}, completed` : label}
+          disabled={!clickable} onClick={() => onStepClick?.(step)}>
+          <span className={styles.key} aria-hidden="true">
+            {completed ? <Check strokeWidth={2.25} /> : <Icon strokeWidth={1.75} />}
+            <i className={styles.led} />
+          </span>
+          <span className={styles.label}>{label}</span>
+        </button>
+      </React.Fragment>;
+    })}
+  </nav>;
 }

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { updateService, UpdateInfo } from '@/services/updateService';
 import { showUpdateNotification } from '@/components/UpdateNotification';
+import { toast } from 'sonner';
 
 interface UseUpdateCheckOptions {
   checkOnMount?: boolean;
@@ -9,57 +10,35 @@ interface UseUpdateCheckOptions {
 }
 
 export function useUpdateCheck(options: UseUpdateCheckOptions = {}) {
-  const {
-    checkOnMount = true,
-    showNotification = true,
-    onUpdateAvailable,
-  } = options;
-
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [isChecking, setIsChecking] = useState(false);
-
-  const checkForUpdates = async (force = false) => {
-    // Skip if checked recently (unless forced)
-    if (!force && updateService.wasCheckedRecently()) {
-      return;
-    }
-
+  const checkForUpdates = useCallback(async (force = false) => {
+    if (!force && updateService.wasCheckedRecently()) return;
     setIsChecking(true);
     try {
       const info = await updateService.checkForUpdates(force);
       setUpdateInfo(info);
-
       if (info.available) {
-        if (onUpdateAvailable) {
-          onUpdateAvailable(info);
-        } else if (showNotification) {
-          showUpdateNotification(info, () => {
-            // This will be handled by the component that uses this hook
-          });
-        }
-      }
+        if (optionsRef.current.onUpdateAvailable) optionsRef.current.onUpdateAvailable(info);
+        else if (optionsRef.current.showNotification !== false) showUpdateNotification(info);
+      } else if (force) toast.success('Tetro is up to date.');
     } catch (error) {
-      console.error('Failed to check for updates:', error);
-      // Silently fail on startup checks to avoid disrupting user experience
+      setUpdateInfo(null);
+      if (force) toast.error('Could not check for updates. Try again later.', { description: String(error) });
     } finally {
       setIsChecking(false);
     }
-  };
+  }, []);
 
+  const checkOnMount = options.checkOnMount !== false;
   useEffect(() => {
-    if (checkOnMount) {
-      // Delay the check slightly to avoid blocking app startup
-      const timer = setTimeout(() => {
-        checkForUpdates(false);
-      }, 2000); // Check 2 seconds after mount
+    if (!checkOnMount) return;
+    const timer = setTimeout(() => void checkForUpdates(), 2000);
+    const interval = setInterval(() => void checkForUpdates(), 6 * 60 * 60 * 1000);
+    return () => { clearTimeout(timer); clearInterval(interval); };
+  }, [checkOnMount, checkForUpdates]);
 
-      return () => clearTimeout(timer);
-    }
-  }, [checkOnMount]);
-
-  return {
-    updateInfo,
-    isChecking,
-    checkForUpdates,
-  };
+  return { updateInfo, isChecking, checkForUpdates };
 }

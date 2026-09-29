@@ -542,7 +542,7 @@ export const AISummary = ({ summary, status, error, onSummaryChange, onRegenerat
     const newSummary: Summary = {
       ...currentSummary,
       [newSectionKey]: {
-        title: 'New Section',
+        title: 'New section',
         blocks: [{
           id: newBlockId,
           type: 'text' as const,
@@ -559,7 +559,7 @@ export const AISummary = ({ summary, status, error, onSummaryChange, onRegenerat
   };
 
   const convertToMarkdown = () => {
-    let markdown = `# AI Generated Summary of Meeting: ${meeting?.id || 'Unknown'} - ${meeting?.title || 'Untitled Meeting'}\n\n`;
+    let markdown = `# AI Generated Summary of Meeting: ${meeting?.id || 'Unknown'} - ${meeting?.title || 'Untitled meeting'}\n\n`;
     markdown += `## Date: ${meeting?.created_at ? new Date(meeting.created_at).toLocaleDateString() : new Date().toLocaleDateString()}\n\n`;
     
     Object.entries(currentSummary).forEach(([key, section]) => {
@@ -610,7 +610,7 @@ export const AISummary = ({ summary, status, error, onSummaryChange, onRegenerat
     <div className="w-full p-4 bg-red-50 border border-red-200 rounded-lg">
       <div className="flex items-center mb-2">
         <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mr-2" />
-        <h3 className="text-red-700 font-medium">Error Generating Summary</h3>
+        <h3 className="text-red-700 font-medium">Couldn’t write the summary</h3>
       </div>
       <p className="text-red-600 text-sm">{error}</p>
       <p className="text-red-500 text-xs mt-2">Please check your model configuration and API keys, or try again.</p>
@@ -623,7 +623,7 @@ export const AISummary = ({ summary, status, error, onSummaryChange, onRegenerat
         <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
         <div>
           <h3 className="text-blue-700 font-medium">
-            {status === 'processing' ? 'Processing Transcript' : 'Generating Summary'}
+            {status === 'processing' ? 'Processing transcript…' : 'Writing summary…'}
           </h3>
           <p className="text-blue-600 text-sm">
             {status === 'processing' 

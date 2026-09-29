@@ -1,0 +1,36 @@
+{
+  "name": "Interview",
+  "description": "Capture an interview's answers and examples, then add a clearly labeled review and up to two practical improvements.",
+  "sections": [
+    {
+      "title": "Interview Summary",
+      "instruction": "Summarize the interview's purpose and main substance as factual recap. Identify the interviewee or topic only when clear from the transcript.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Key Answers",
+      "instruction": "Summarize the interviewee's most important answers and the questions they addressed. Preserve distinctions between what was asked, answered, and left unanswered.",
+      "format": "list"
+    },
+    {
+      "title": "Examples & Evidence",
+      "instruction": "Capture concrete experiences, examples, results, or supporting details the interviewee gave. Do not invent achievements, numbers, or verbatim quotes.",
+      "format": "list"
+    },
+    {
+      "title": "Interview Review",
+      "instruction": "Give a brief, explicitly subjective impression of how clearly and specifically the interviewee answered, grounded in particular answers. For a behavioral job interview, discuss how well their examples covered Situation, Task, their own Action, and Result (STAR); for other interview types, review answer quality without forcing STAR. Do not assign a score or infer a hiring decision or personal traits.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Improvements for Next Time",
+      "instruction": "Suggest one or two concrete ways the interviewee could improve future interviews, based on specific answers in this recording. Treat these as coaching suggestions, not facts about the person; omit the section if the recording does not support a useful suggestion.",
+      "format": "list"
+    },
+    {
+      "title": "Follow-ups",
+      "instruction": "List only follow-up actions explicitly agreed or requested during the interview, with owner and timing only when stated. Omit this section when there are none.",
+      "format": "list"
+    }
+  ]
+}

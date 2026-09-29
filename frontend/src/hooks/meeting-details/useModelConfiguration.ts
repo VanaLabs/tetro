@@ -32,18 +32,7 @@ export function useModelConfiguration({ serverAddress }: UseModelConfigurationPr
             hasApiKey: !!data.apiKey,
             ollamaEndpoint: data.ollamaEndpoint || 'default'
           });
-          // Fetch API key if not included and provider requires it
-          if (data.provider !== 'ollama' && data.provider !== 'custom-openai' && !data.apiKey) {
-            try {
-              const apiKeyData = await invokeTauri('api_get_api_key', {
-                provider: data.provider
-              }) as string;
-              data.apiKey = apiKeyData;
-            } catch (err) {
-              console.error('Failed to fetch API key:', err);
-            }
-          }
-
+          data.apiKey = null;
           // Fetch custom OpenAI config if provider is custom-openai
           if (data.provider === 'custom-openai') {
             try {
@@ -52,7 +41,7 @@ export function useModelConfiguration({ serverAddress }: UseModelConfigurationPr
                 data.customOpenAIDisplayName = customConfig.displayName || null;
                 data.customOpenAIEndpoint = customConfig.endpoint || null;
                 data.customOpenAIModel = customConfig.model || null;
-                data.customOpenAIApiKey = customConfig.apiKey || null;
+                data.customOpenAIApiKey = null;
                 data.maxTokens = customConfig.maxTokens || null;
                 data.temperature = customConfig.temperature || null;
                 data.topP = customConfig.topP || null;
@@ -89,7 +78,7 @@ export function useModelConfiguration({ serverAddress }: UseModelConfigurationPr
     const setupListener = async () => {
       const { listen } = await import('@tauri-apps/api/event');
       const unlisten = await listen<ModelConfig>('model-config-updated', (event) => {
-        setModelConfig(event.payload);
+        setModelConfig({ ...event.payload, apiKey: null, customOpenAIApiKey: null });
       });
 
       return unlisten;
@@ -125,11 +114,12 @@ export function useModelConfiguration({ serverAddress }: UseModelConfigurationPr
       });
 
       console.log('Save model config success');
-      setModelConfig(payload);
+      const publicConfig = { ...payload, apiKey: null, customOpenAIApiKey: null };
+      setModelConfig(publicConfig);
 
       // Emit event to sync other components
       const { emit } = await import('@tauri-apps/api/event');
-      await emit('model-config-updated', payload).catch(() => console.warn('Model saved; another open view could not be refreshed.'));
+      await emit('model-config-updated', publicConfig).catch(() => console.warn('Model saved; another open view could not be refreshed.'));
 
 
 

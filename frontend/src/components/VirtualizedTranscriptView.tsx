@@ -11,7 +11,6 @@ import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useTranscriptStreaming } from "@/hooks/useTranscriptStreaming";
 import { ConfidenceIndicator } from "./ConfidenceIndicator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { RecordingStatusBar } from "./RecordingStatusBar";
 import { motion, AnimatePresence } from "framer-motion";
 import { TranscriptSegmentData } from "@/types";
 
@@ -326,17 +325,8 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
 
     return (
         <div ref={scrollRef} className="tetro-transcript-scroll flex flex-col h-full overflow-y-auto px-4 py-2">
-            {/* Recording Status Bar - Sticky at top, always visible when recording */}
-            <AnimatePresence>
-                {isRecording && (
-                    <div className="sticky top-0 z-10 bg-white pb-2">
-                        <RecordingStatusBar isPaused={isPaused} />
-                    </div>
-                )}
-            </AnimatePresence>
-
             {/* Content - add padding when recording to prevent overlap */}
-            <div className={isRecording ? 'pt-2' : ''}>
+            <div>
             {segments.length === 0 ? (
                 // Empty state
                 <motion.div
@@ -346,15 +336,11 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                 >
                     {isRecording ? (
                         <>
-                            <div className="flex items-center justify-center mb-3">
-                                <div className={`w-3 h-3 rounded-full ${isPaused ? 'bg-orange-500' : 'bg-blue-500 animate-pulse'}`}></div>
+                            <div className="tetro-ready tetro-listening" data-paused={isPaused || undefined}>
+                                <span className="tetro-listening-dot" aria-hidden="true" />
+                                <p className="tetro-ready-title">{isPaused ? 'Recording paused' : 'Listening…'}</p>
+                                <p className="tetro-ready-sub">{isPaused ? 'Press Resume to keep recording.' : 'Words appear here as people speak.'}</p>
                             </div>
-                            <p className="text-sm text-gray-600">
-                                {isPaused ? 'Recording paused' : 'Listening for speech...'}
-                            </p>
-                            <p className="text-xs mt-1 text-gray-400">
-                                {isPaused ? 'Click resume to continue recording' : 'Speak to see live transcription'}
-                            </p>
                         </>
                     ) : (
                         <>{emptyState ?? <div className="tetro-ready">
@@ -436,7 +422,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                             exit={{ opacity: 0 }}
                             className="flex items-center gap-2 mt-4 text-gray-500"
                         >
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-[var(--tetro-accent)] rounded-full animate-pulse"></div>
                             <span className="text-sm">Listening...</span>
                         </motion.div>
                     )}
@@ -501,7 +487,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                             exit={{ opacity: 0 }}
                             className="flex items-center gap-2 mt-4 text-gray-500"
                         >
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-[var(--tetro-accent)] rounded-full animate-pulse"></div>
                             <span className="text-sm">Listening...</span>
                         </motion.div>
                     )}

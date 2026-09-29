@@ -1,4 +1,4 @@
-export type OnboardingStep = 1 | 2 | 3 | 4;
+export type OnboardingStep = 1 | 2 | 3;
 
 export type PermissionStatus = 'checking' | 'not_determined' | 'authorized' | 'denied';
 
@@ -9,15 +9,18 @@ export interface OnboardingPermissions {
 }
 
 export interface OnboardingContainerProps {
-  title: string;
+  title: React.ReactNode;
   description?: React.ReactNode;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   step?: number;
   totalSteps?: number;
   stepOffset?: number;
   hideProgress?: boolean;
+  centered?: boolean;
   className?: string;
   showNavigation?: boolean;
+  navigationDisabled?: boolean;
   onNext?: () => void;
   onPrevious?: () => void;
   canGoNext?: boolean;
@@ -30,6 +33,8 @@ export interface PermissionRowProps {
   description: string;
   status: PermissionStatus;
   isPending?: boolean;
+  disabled?: boolean;
+  actionLabel?: string;
   onAction: () => void;
 }
 

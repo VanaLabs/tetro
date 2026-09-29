@@ -78,14 +78,14 @@ interface ConfigContextType {
   isAutoSummary: boolean;
   toggleIsAutoSummary: (checked: boolean) => void;
 
-  // Provider-specific API keys
+  // Provider connection status
   providerApiKeys: {
-    claude: string | null;
-    groq: string | null;
-    openai: string | null;
-    openrouter: string | null;
+    claude: boolean;
+    groq: boolean;
+    openai: boolean;
+    openrouter: boolean;
   };
-  updateProviderApiKey: (provider: string, apiKey: string | null) => void;
+  updateProviderApiKey: (provider: string, connected: boolean) => void;
 
   // Preference settings (lazy loaded)
   notificationSettings: NotificationSettings | null;
@@ -100,8 +100,8 @@ const ConfigContext = createContext<ConfigContextType | undefined>(undefined);
 export function ConfigProvider({ children }: { children: ReactNode }) {
   // Model configuration state
   const [modelConfig, setModelConfig] = useState<ModelConfig>({
-    provider: 'ollama',
-    model: 'llama3.2:latest',
+    provider: 'builtin-ai',
+    model: '',
     whisperModel: 'large-v3',
     ollamaEndpoint: null
   });
@@ -114,18 +114,18 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     apiKey: null
   });
 
-  // Provider-specific API keys (loaded once at startup)
+  // Provider connection status (loaded once at startup)
   // Note: Gemini omitted for now - add when UI support is added
   const [providerApiKeys, setProviderApiKeys] = useState<{
-    claude: string | null;
-    groq: string | null;
-    openai: string | null;
-    openrouter: string | null;
+    claude: boolean;
+    groq: boolean;
+    openai: boolean;
+    openrouter: boolean;
   }>({
-    claude: null,
-    groq: null,
-    openai: null,
-    openrouter: null,
+    claude: false,
+    groq: false,
+    openai: false,
+    openrouter: false,
   });
 
   // Ollama models list and error state
@@ -212,7 +212,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           setTranscriptModelConfig({
             provider: config.provider || 'parakeet',
             model: config.model || 'stt-parakeet-multilingual',
-            apiKey: config.apiKey || null
+            apiKey: null
           });
         }
       } catch (error) {
@@ -259,7 +259,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
                   whisperModel: data.whisperModel || prev.whisperModel,
                   customOpenAIEndpoint: customConfig.endpoint,
                   customOpenAIModel: customConfig.model,
-                  customOpenAIApiKey: customConfig.apiKey,
+                  customOpenAIApiKey: null,
                   maxTokens: customConfig.maxTokens,
                   temperature: customConfig.temperature,
                   topP: customConfig.topP,
@@ -283,7 +283,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
           setModelConfig(prev => ({
             ...prev,
             provider: data.provider,
-            model: data.model || prev.model,
+            model: data.model ?? prev.model,
             whisperModel: data.whisperModel || prev.whisperModel,
             ollamaEndpoint: data.ollamaEndpoint,
           }));
@@ -304,15 +304,15 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     fetchModelConfig();
   }, []);
 
-  // Load all provider API keys on mount
+  // Load presence flags; saved secrets never enter the webview.
   useEffect(() => {
     const loadAllApiKeys = async () => {
       try {
         const providers = ['claude', 'groq', 'openai', 'openrouter'];
         const keys = await Promise.all(
           providers.map(p =>
-            invoke<string>('api_get_api_key', { provider: p })
-              .catch(() => null) // Gracefully handle missing keys
+            invoke<boolean>('api_get_api_key', { provider: p })
+              .catch(error => { console.error('Could not check saved provider key:', error); return false; })
           )
         );
 
@@ -329,6 +329,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     };
 
     loadAllApiKeys();
+    window.addEventListener('tetro:credentials-access-changed', loadAllApiKeys);
+    return () => window.removeEventListener('tetro:credentials-access-changed', loadAllApiKeys);
   }, []);
 
   // Listen for model config updates from other components
@@ -337,11 +339,13 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const { listen } = await import('@tauri-apps/api/event');
       const unlisten = await listen<ModelConfig>('model-config-updated', (event) => {
         // Never log model configuration: it can contain service credentials.
-        setModelConfig(event.payload);
+        setModelConfig({ ...event.payload, apiKey: null, customOpenAIApiKey: null });
 
         // Update provider-specific key when config changes
-        if (event.payload.apiKey && event.payload.provider !== 'custom-openai') {
-          updateProviderApiKey(event.payload.provider, event.payload.apiKey);
+        if (['openai', 'claude', 'groq', 'openrouter'].includes(event.payload.provider)) {
+          void invoke<boolean>('api_get_api_key', { provider: event.payload.provider })
+            .then(connected => updateProviderApiKey(event.payload.provider, connected))
+            .catch(error => console.error('Could not check saved provider key:', error));
         }
       });
       return unlisten;
@@ -413,8 +417,8 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Update individual provider API key
-  const updateProviderApiKey = useCallback((provider: string, apiKey: string | null) => {
-    setProviderApiKeys(prev => ({ ...prev, [provider]: apiKey }));
+  const updateProviderApiKey = useCallback((provider: string, connected: boolean) => {
+    setProviderApiKeys(prev => ({ ...prev, [provider]: connected }));
   }, []);
 
   // Lazy load preference settings (only loads if not already cached)

@@ -1,0 +1,36 @@
+.track { display:flex; align-items:flex-start; justify-content:center; width:100%; }
+.step { width:112px; flex:0 0 112px; display:flex; flex-direction:column; align-items:center; gap:10px; padding:0; border:0; background:transparent; color:var(--tetro-muted); text-align:center; }
+.step:disabled { cursor:default; }
+.step:not(:disabled) { cursor:pointer; }
+.step:not(:disabled):focus-visible { outline:2px solid var(--tetro-accent); outline-offset:5px; border-radius:9px; }
+
+/* The keycap: same materials as the recorder keys. */
+.key { position:relative; display:grid; place-items:center; width:40px; height:38px; border-radius:9px; color:var(--tetro-faint);
+  background:var(--tetro-key); border:1px solid var(--tetro-key-edge); border-bottom-color:var(--tetro-key-drop);
+  box-shadow:0 2px 0 var(--tetro-key-drop),var(--tetro-key-hi); margin-bottom:2px;
+  transition:transform 120ms ease-out,box-shadow 120ms ease-out,background-color 120ms,color 120ms; }
+.key svg { width:17px; height:17px; }
+.led { position:absolute; top:5px; right:5px; width:4px; height:4px; border-radius:50%; background:var(--tetro-led-off); transition:background .2s,box-shadow .2s; }
+
+/* Current step: latched down, LED lit. */
+.step[data-active] .key { color:var(--tetro-ink); transform:translateY(2px); background:var(--tetro-key-pressed); box-shadow:var(--tetro-key-inset); border-color:var(--tetro-key-drop); }
+.step[data-active] .led { background:var(--tetro-accent); box-shadow:0 0 5px var(--tetro-accent); }
+
+/* Finished steps: raised again, check mark, steady light. */
+.step[data-complete] .key { color:var(--tetro-accent-ink,var(--tetro-accent)); }
+.step[data-complete] .led { background:color-mix(in srgb,var(--tetro-accent) 70%,var(--tetro-led-off)); }
+.step:not(:disabled):hover .key { color:var(--tetro-ink); border-color:var(--tetro-faint); border-bottom-color:var(--tetro-key-drop); }
+
+.label { max-width:112px; color:var(--tetro-muted); font-size:11px; font-weight:500; line-height:1.25; white-space:nowrap; }
+.step[data-active] .label { color:var(--tetro-ink); font-weight:600; }
+
+/* Connectors: a groove that fills in as you go. */
+.connector { width:36px; height:2px; flex:0 0 36px; margin-top:19px; border-radius:1px; background:var(--tetro-line); box-shadow:inset 0 1px 0 rgba(0,0,0,.06); }
+.connector[data-complete] { background:color-mix(in srgb,var(--tetro-accent) 55%,var(--tetro-line)); }
+
+@media (max-width:440px) {
+  .step { width:88px; flex-basis:88px; }
+  .label { max-width:88px; font-size:10px; }
+  .connector { width:18px; flex-basis:18px; }
+}
+@media (prefers-reduced-motion:reduce) { .key,.led { transition:none; } }

@@ -7,25 +7,25 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 use tokio::sync::Mutex;
 
 use super::model_manager::{DownloadProgress, ModelInfo, ModelManager};
-
-const QWEN35_4B_RECOMMENDED_RAM_GB: u64 = 14;
+use crate::database::repositories::setting::SettingsRepository;
+use crate::state::AppState;
 
 pub(crate) fn summary_model_priority(model_name: &str) -> u8 {
     match model_name {
-        "qwen3.5:4b" => 4,
-        "qwen3.5:2b" => 3,
+        "qwen3.5:2b" => 4,
+        "qwen3.5:4b" => 3,
         "gemma3:4b" => 2,
         "gemma3:1b" => 1,
         _ => 0,
     }
 }
 
-pub(crate) fn recommend_summary_model(_is_macos: bool, system_ram_gb: u64) -> &'static str {
-    if system_ram_gb >= QWEN35_4B_RECOMMENDED_RAM_GB {
-        "qwen3.5:4b"
-    } else {
-        "qwen3.5:2b"
-    }
+/// Tetro recommends Qwen 3.5 2B on every device. It is the model onboarding sets up; the 4B
+/// model stays available in Settings for people who want it.
+pub(crate) const RECOMMENDED_SUMMARY_MODEL: &str = "qwen3.5:2b";
+
+pub(crate) fn recommend_summary_model(_is_macos: bool, _system_ram_gb: u64) -> &'static str {
+    RECOMMENDED_SUMMARY_MODEL
 }
 
 pub(crate) fn get_recommended_summary_model_for_current_system() -> Result<&'static str, String> {
@@ -92,6 +92,7 @@ pub async fn builtin_ai_list_models<R: Runtime>(
             .clone()
     };
 
+    manager.scan_models().await.map_err(|e| e.to_string())?;
     let models = manager.list_models().await;
     Ok(models)
 }
@@ -131,7 +132,9 @@ pub async fn builtin_ai_get_model_info<R: Runtime>(
 pub async fn builtin_ai_download_model<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, ModelManagerState>,
+    db_state: State<'_, AppState>,
     model_name: String,
+    select_when_ready: Option<bool>,
 ) -> Result<(), String> {
     let manager = {
         // Ensure manager is initialized
@@ -175,6 +178,27 @@ pub async fn builtin_ai_download_model<R: Runtime>(
     {
         Ok(_) => {
             // Download task completed successfully (validation passed, status set to Available)
+            let mut selection_error = None;
+            if select_when_ready.unwrap_or(false) {
+                let pool = db_state.db_manager.pool();
+                match SettingsRepository::select_summary_model_if_unselected(pool, &model_name).await {
+                    Ok(true) => {
+                        if let Ok(Some(config)) = SettingsRepository::get_model_config(pool).await {
+                            let _ = app.emit("model-config-updated", serde_json::json!({
+                                "provider": config.provider,
+                                "model": config.model,
+                                "whisperModel": config.whisper_model,
+                                "apiKey": null,
+                                "ollamaEndpoint": config.ollama_endpoint,
+                            }));
+                        }
+                    }
+                    Ok(false) => {} // Another model was chosen while this download ran.
+                    Err(error) => selection_error = Some(format!(
+                        "Downloaded {model_name}, but couldn't select it for summaries: {error}"
+                    )),
+                }
+            }
             let _ = app.emit(
                 "builtin-ai-download-progress",
                 serde_json::json!({
@@ -186,6 +210,13 @@ pub async fn builtin_ai_download_model<R: Runtime>(
                     "status": "completed"
                 }),
             );
+            if let Some(error) = selection_error {
+                let _ = app.emit("builtin-ai-model-selection-error", serde_json::json!({
+                    "model": model_name,
+                    "error": error,
+                }));
+                return Err(error);
+            }
             Ok(())
         },
         Err(e) => {
@@ -228,19 +259,21 @@ pub async fn builtin_ai_cancel_download<R: Runtime>(
             .clone()
     };
 
-    manager
+    let stopped = manager
         .cancel_download(&model_name)
         .await
         .map_err(|e| e.to_string())?;
 
-    let _ = app.emit(
-        "builtin-ai-download-progress",
-        serde_json::json!({
-            "model": model_name,
-            "progress": 0,
-            "status": "cancelled"
-        }),
-    );
+    if stopped {
+        let _ = app.emit(
+            "builtin-ai-download-progress",
+            serde_json::json!({
+                "model": model_name,
+                "progress": 0,
+                "status": "cancelled"
+            }),
+        );
+    }
 
     Ok(())
 }
@@ -382,10 +415,7 @@ pub async fn init_model_manager_at_startup<R: Runtime>(
 }
 
 
-/// Get recommended summary model based on platform and system RAM.
-/// macOS → qwen3.5:4b
-/// non-macOS + <8GB RAM → qwen3.5:2b
-/// non-macOS + >=8GB RAM → qwen3.5:4b
+/// Get the recommended summary model: Qwen 3.5 2B on every platform and RAM size.
 #[tauri::command]
 pub async fn builtin_ai_get_recommended_model() -> Result<String, String> {
     let recommended = get_recommended_summary_model_for_current_system()?;
@@ -412,21 +442,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn recommended_summary_model_uses_qwen2b_below_effective_16gb_floor() {
-        assert_eq!(recommend_summary_model(true, 13), "qwen3.5:2b");
-        assert_eq!(recommend_summary_model(false, 13), "qwen3.5:2b");
+    fn recommended_summary_model_is_qwen2b_on_every_device() {
+        for ram_gb in [4, 8, 13, 14, 16, 32, 64] {
+            assert_eq!(recommend_summary_model(true, ram_gb), "qwen3.5:2b");
+            assert_eq!(recommend_summary_model(false, ram_gb), "qwen3.5:2b");
+        }
     }
 
     #[test]
-    fn recommended_summary_model_uses_qwen4b_at_effective_16gb_floor() {
-        assert_eq!(recommend_summary_model(true, 14), "qwen3.5:4b");
-        assert_eq!(recommend_summary_model(false, 14), "qwen3.5:4b");
-    }
-
-    #[test]
-    fn available_summary_model_priority_prefers_qwen_over_gemma() {
-        assert!(summary_model_priority("qwen3.5:4b") > summary_model_priority("qwen3.5:2b"));
-        assert!(summary_model_priority("qwen3.5:2b") > summary_model_priority("gemma3:4b"));
+    fn available_summary_model_priority_prefers_qwen2b_then_qwen_over_gemma() {
+        assert!(summary_model_priority("qwen3.5:2b") > summary_model_priority("qwen3.5:4b"));
+        assert!(summary_model_priority("qwen3.5:4b") > summary_model_priority("gemma3:4b"));
         assert!(summary_model_priority("gemma3:4b") > summary_model_priority("gemma3:1b"));
     }
 }

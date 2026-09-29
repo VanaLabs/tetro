@@ -154,7 +154,7 @@ export default function RootLayout({
 
     if (!betaFeatures.importAndRetranscribe) {
       toast.error('Beta feature disabled', {
-        description: 'Enable "Import Audio & Retranscribe" in Settings > Beta to use this feature.'
+        description: 'Enable "Import audio & retranscribe" in Settings > Beta to use this feature.'
       });
       return;
     }
@@ -257,7 +257,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                var t = window.localStorage.getItem('meetily-theme');
+                var t = window.localStorage.getItem('tetro-theme') || window.localStorage.getItem('meetily-theme');
                 if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                   document.documentElement.classList.add('dark');
                 }

@@ -1,7 +1,7 @@
 {
     "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
     "productName": "Tetro",
-    "version": "0.4.1",
+    "version": "9.1.0",
     "identifier": "am.vanalabs.tetro",
     "build": {
         "frontendDist": "../out",
@@ -57,7 +57,8 @@
                         "store:default",
                         "notification:default",
                         "notification:allow-is-permission-granted",
-                        "process:default"
+                        "process:default",
+                        "updater:default"
                     ]
                 }
             ]
@@ -96,5 +97,12 @@
             "signCommand": "powershell -ExecutionPolicy Bypass -File scripts/sign-windows.ps1 -FilePath %1"
         }
     },
-    "plugins": {}
+    "plugins": {
+        "updater": {
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMzNUNENkMwREZCODQ2ODQKUldTRVJyamZ3TlpjTSt4QnU0cEZHUk43SkRCTERCM0tVcUt4dnVxcXFJOXVjZW1qdHB0UlNmbTAK",
+            "endpoints": [
+                "https://github.com/VanaLabs/tetro/releases/latest/download/latest.json"
+            ]
+        }
+    }
 }

@@ -13,8 +13,7 @@ export interface ModelConfig {
   model: string;
   whisperModel: string;
   /**
-   * @deprecated Use providerApiKeys from ConfigContext instead.
-   * This field may contain stale data when provider changes without saving.
+   * Write-only draft. Saved configurations and events never contain the key.
    */
   apiKey?: string | null;
   ollamaEndpoint?: string | null;
@@ -29,7 +28,8 @@ export interface ModelConfig {
 
 export interface CustomOpenAIConfig {
   endpoint: string;
-  apiKey: string | null;
+  apiKey?: string | null;
+  hasApiKey?: boolean;
   model: string;
   maxTokens: number | null;
   temperature: number | null;

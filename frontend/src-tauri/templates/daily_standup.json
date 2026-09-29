@@ -31,8 +31,8 @@
       "item_format": "| **Owner** | **Blocker** | Impact |\n| --- | --- | --- |"
     },
     {
-      "title": "Notes",
-      "instruction": "Optional quick notes or announcements",
+      "title": "Additional details",
+      "instruction": "Optional details or announcements",
       "format": "paragraph"
     }
   ]

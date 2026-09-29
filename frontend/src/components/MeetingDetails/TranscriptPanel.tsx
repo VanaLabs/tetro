@@ -191,7 +191,7 @@ export function TranscriptPanel({
         const total = replaceOffer.lines.reduce((n, l) => n + l.count, 0);
         return <div className="tetro-replace-offer" role="status">
           <span>Change <b>{total}</b> more “{replaceOffer.from}” to “{replaceOffer.to}”?</span>
-          {/(\p{Lu}|\p{N})/u.test(replaceOffer.to) || replaceOffer.to.length >= 5 ? <button className="tetro-link" onClick={() => { const term = replaceOffer.to; void addVocabularyTerm(term).then(() => toast.success(`“${term}” added to names & terms`)).catch(e => toast.error(String(e))); }} title="Spell it this way in future transcripts and notes">Add “{replaceOffer.to}” to names &amp; terms</button> : null}
+          {/(\p{Lu}|\p{N})/u.test(replaceOffer.to) || replaceOffer.to.length >= 5 ? <button className="tetro-link" onClick={() => { const term = replaceOffer.to; void addVocabularyTerm(term).then(() => toast.success(`“${term}” added to names & terms`)).catch(e => toast.error(String(e))); }} title="Spell it this way in future transcripts and summaries">Add “{replaceOffer.to}” to names &amp; terms</button> : null}
           <button className="tetro-key" onClick={() => setReplaceOffer(null)} disabled={replacing}>Not now</button>
           <button className="tetro-key tetro-key-amber" onClick={() => void replaceAll()} disabled={replacing}>{replacing ? 'Replacing…' : 'Replace all'}</button>
         </div>;

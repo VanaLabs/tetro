@@ -119,17 +119,7 @@ const Sidebar: React.FC = () => {
       try {
         const data = await invoke('api_get_model_config') as any;
         if (data && data.provider !== null) {
-          // Fetch API key if not included and provider requires it
-          if (data.provider !== 'ollama' && !data.apiKey) {
-            try {
-              const apiKeyData = await invoke('api_get_api_key', {
-                provider: data.provider
-              }) as string;
-              data.apiKey = apiKeyData;
-            } catch (err) {
-              console.error('Failed to fetch API key:', err);
-            }
-          }
+          data.apiKey = null;
           setModelConfig(data);
         }
       } catch (error) {
@@ -191,19 +181,21 @@ const Sidebar: React.FC = () => {
         ollamaEndpoint: config.ollamaEndpoint,
       });
 
-      setModelConfig(config);
+      const publicConfig = { ...config, apiKey: null, customOpenAIApiKey: null };
+      setModelConfig(publicConfig);
       console.log('Model config saved successfully');
       setSettingsSaveSuccess(true);
 
       // Emit event to sync other components
       const { emit } = await import('@tauri-apps/api/event');
-      await emit('model-config-updated', config);
+      await emit('model-config-updated', publicConfig);
 
       // Track settings change
 
     } catch (error) {
       console.error('Error saving model config:', error);
       setSettingsSaveSuccess(false);
+      throw error;
     }
   };
 
@@ -474,7 +466,7 @@ const Sidebar: React.FC = () => {
               </button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>{isRecording ? "Recording in progress..." : "Start Recording"}</p>
+              <p>{isRecording ? "Recording in progress..." : "Start recording"}</p>
             </TooltipContent>
           </Tooltip>
 
@@ -489,7 +481,7 @@ const Sidebar: React.FC = () => {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">
-                <p>Import Audio</p>
+                <p>Import audio</p>
               </TooltipContent>
             </Tooltip>
           )}
@@ -508,7 +500,7 @@ const Sidebar: React.FC = () => {
               </button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>Meeting Notes</p>
+              <p>Meeting summaries</p>
             </TooltipContent>
           </Tooltip>
 
@@ -771,7 +763,7 @@ const Sidebar: React.FC = () => {
               ) : (
                 <>
                   <Mic className="w-4 h-4 mr-2" />
-                  <span>Start Recording</span>
+                  <span>Start recording</span>
                 </>
               )}
             </button>
@@ -782,7 +774,7 @@ const Sidebar: React.FC = () => {
                 className="w-full flex items-center justify-center px-3 py-2 mt-1 text-sm font-medium text-gray-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors shadow-sm"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                <span>Import Audio</span>
+                <span>Import audio</span>
               </button>
             )}
 
@@ -826,14 +818,14 @@ const Sidebar: React.FC = () => {
       }}>
         <DialogContent className="sm:max-w-[425px]">
           <VisuallyHidden>
-            <DialogTitle>Edit Meeting Title</DialogTitle>
+            <DialogTitle>Edit meeting title</DialogTitle>
           </VisuallyHidden>
           <div className="py-4">
-            <h3 className="text-lg font-semibold mb-4">Edit Meeting Title</h3>
+            <h3 className="text-lg font-semibold mb-4">Edit meeting title</h3>
             <div className="space-y-4">
               <div>
                 <label htmlFor="meeting-title" className="block text-sm font-medium text-gray-700 mb-2">
-                  Meeting Title
+                  Meeting title
                 </label>
                 <input
                   id="meeting-title"

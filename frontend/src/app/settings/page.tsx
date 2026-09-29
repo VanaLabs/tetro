@@ -1,12 +1,12 @@
 'use client';
 
+import { PermissionsSettings } from '@/components/PermissionsSettings';
 import { BetaSettings } from '@/components/BetaSettings';
 import { StorageSettings } from '@/components/StorageSettings';
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { ArrowLeft, Settings2, Mic, Database as DatabaseIcon, SparkleIcon, Boxes, HardDrive, FlaskConical } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Settings2, Mic, Database as DatabaseIcon, SparkleIcon, Boxes, HardDrive, FlaskConical, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { invoke } from '@tauri-apps/api/core';
-import { motion } from 'framer-motion';
 import { RecordingSettings } from '@/components/RecordingSettings';
 import { PreferenceSettings } from '@/components/PreferenceSettings';
 import { SummaryModelSettings } from '@/components/SummaryModelSettings';
@@ -14,40 +14,44 @@ import { ModelsSettings, TranscriptionSettings, type ModelsSection } from '@/com
 import { useConfig } from '@/contexts/ConfigContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
-// Tabs configuration (constant)
+// Sections in a left sidebar, each with a short hint. Beta sits apart at the bottom.
 const TABS = [
-  { value: 'general', label: 'General', icon: Settings2 },
-  { value: 'recording', label: 'Recordings', icon: Mic },
-  { value: 'Transcriptionmodels', label: 'Transcription', icon: DatabaseIcon },
-  { value: 'summaryModels', label: 'Summary', icon: SparkleIcon },
-  { value: 'models', label: 'Models', icon: Boxes },
-  { value: 'storage', label: 'Storage', icon: HardDrive },
-  { value: 'beta', label: 'Beta', icon: FlaskConical }
+  { value: 'general', label: 'General', hint: 'Appearance, notifications, folder', icon: Settings2 },
+  { value: 'recording', label: 'Recordings', hint: 'Audio files, names, shortcuts, devices', icon: Mic },
+  { value: 'Transcriptionmodels', label: 'Transcription', hint: 'Model in use, vocabulary', icon: DatabaseIcon },
+  { value: 'summaryModels', label: 'Summary', hint: 'Model in use, automatic summaries', icon: SparkleIcon },
+  { value: 'models', label: 'Models', hint: 'Download and connect models', icon: Boxes },
+  { value: 'permissions', label: 'Permissions', hint: 'Microphone and computer audio access', icon: ShieldCheck },
+  { value: 'storage', label: 'Storage', hint: 'Disk space and cleanup', icon: HardDrive },
+  { value: 'beta', label: 'Beta', hint: 'Features still being tested', icon: FlaskConical }
 ] as const;
 
 export default function SettingsPage() {
   const router = useRouter();
   const { setTranscriptModelConfig } = useConfig();
 
-  // Animation state for tabs
   const [activeTab, setActiveTab] = useState('general');
   const [modelsSection, setModelsSection] = useState<ModelsSection>('transcription');
-  const openModels = (section: ModelsSection) => { setModelsSection(section); setActiveTab('models'); };
+  const [browseTranscriptionOnOpen, setBrowseTranscriptionOnOpen] = useState(false);
+  const [browseSummaryOnOpen, setBrowseSummaryOnOpen] = useState(false);
+  const openModels = (section: ModelsSection) => { setModelsSection(section); if (section === 'transcription') setBrowseTranscriptionOnOpen(true); if (section === 'summary') setBrowseSummaryOnOpen(true); setActiveTab('models'); };
   useEffect(() => {
     const tab = sessionStorage.getItem('tetro.settingsTab');
     if (TABS.some(item => item.value === tab)) setActiveTab(tab!);
     const section = sessionStorage.getItem('tetro.modelsSection');
     if (section === 'transcription' || section === 'summary' || section === 'external') setModelsSection(section);
+    if (sessionStorage.getItem('tetro.browseTranscriptionModels') === '1') setBrowseTranscriptionOnOpen(true);
+    if (sessionStorage.getItem('tetro.browseSummaryModels') === '1') setBrowseSummaryOnOpen(true);
     sessionStorage.removeItem('tetro.settingsTab');
     sessionStorage.removeItem('tetro.modelsSection');
+    sessionStorage.removeItem('tetro.browseSummaryModels');
+    sessionStorage.removeItem('tetro.browseTranscriptionModels');
   }, []);
   useEffect(() => {
     const choose = (event: Event) => { const tab = (event as CustomEvent).detail; if (TABS.some(item => item.value === tab)) setActiveTab(tab); };
     window.addEventListener('tetro:settings-tab', choose);
     return () => window.removeEventListener('tetro:settings-tab', choose);
   }, []);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [underlineStyle, setUnderlineStyle] = useState({ left: 0, width: 0 });
 
   // Load saved transcript configuration on mount
   useEffect(() => {
@@ -58,7 +62,7 @@ export default function SettingsPage() {
           setTranscriptModelConfig({
             provider: config.provider || 'localWhisper',
             model: config.model || 'large-v3',
-            apiKey: config.apiKey || null
+            apiKey: null
           });
         }
       } catch (error) {
@@ -68,16 +72,7 @@ export default function SettingsPage() {
     loadTranscriptConfig();
   }, [setTranscriptModelConfig]);
 
-  // Update underline position when active tab changes
-  useLayoutEffect(() => {
-    const activeIndex = TABS.findIndex(tab => tab.value === activeTab);
-    const activeTabElement = tabRefs.current[activeIndex];
-
-    if (activeTabElement) {
-      const { offsetLeft, offsetWidth } = activeTabElement;
-      setUnderlineStyle({ left: offsetLeft, width: offsetWidth });
-    }
-  }, [activeTab]);
+  const active = TABS.find(tab => tab.value === activeTab) ?? TABS[0];
 
   return (
     <div className="tetro-settings h-full min-h-0 bg-gray-50 flex flex-col">
@@ -98,55 +93,48 @@ export default function SettingsPage() {
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl mx-auto p-8 pt-6">
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-transparent relative rounded-none border-b border-gray-200 p-0 h-auto">
-              {TABS.map((tab, index) => {
+      <div data-settings-scroll className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
+        <div className="tetro-settings-sheet">
+          <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="tetro-settings-layout">
+            <TabsList className="tetro-settings-nav" aria-label="Settings sections">
+              {TABS.map(tab => {
                 const Icon = tab.icon;
                 return (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    ref={el => { tabRefs.current[index] = el }}
-                    className="flex items-center gap-2 px-6 py-4 bg-transparent rounded-none border-0 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none text-gray-600 hover:text-gray-900 relative z-10"
-                  >
-                    <Icon className="w-4 h-4" />
-                    {tab.label}
+                  <TabsTrigger key={tab.value} value={tab.value} className={tab.value === 'beta' ? 'is-apart' : undefined}>
+                    <Icon aria-hidden="true" />
+                    <span><strong>{tab.label}</strong><small>{tab.hint}</small></span>
                   </TabsTrigger>
                 );
               })}
-
-              <motion.div
-                className="absolute bottom-0 z-20 h-0.5 bg-blue-600"
-                layoutId="underline"
-                style={{ left: underlineStyle.left, width: underlineStyle.width }}
-                transition={{ type: 'spring', stiffness: 400, damping: 40 }}
-              />
             </TabsList>
 
-            <TabsContent value="general">
-              <PreferenceSettings />
-            </TabsContent>
-            <TabsContent value="recording">
-              <RecordingSettings />
-            </TabsContent>
-            <TabsContent value="Transcriptionmodels">
-              <TranscriptionSettings onOpenModels={() => openModels('transcription')} />
-            </TabsContent>
-            <TabsContent value="summaryModels">
-              <SummaryModelSettings onOpenModels={() => openModels('summary')} onOpenExternalModels={() => openModels('external')} />
-            </TabsContent>
-            <TabsContent value="models">
-              <ModelsSettings section={modelsSection} onSectionChange={setModelsSection} />
-            </TabsContent>
-            <TabsContent value="storage">
-              <StorageSettings />
-            </TabsContent>
-            <TabsContent value="beta">
-              <BetaSettings />
-            </TabsContent>
+            <div className="tetro-settings-panel">
+              <header className="tetro-settings-panel-head"><h2>{active.label}</h2></header>
+              <TabsContent value="general">
+                <PreferenceSettings />
+              </TabsContent>
+              <TabsContent value="recording">
+                <RecordingSettings />
+              </TabsContent>
+              <TabsContent value="Transcriptionmodels">
+                <TranscriptionSettings onOpenModels={() => openModels('transcription')} />
+              </TabsContent>
+              <TabsContent value="summaryModels">
+                <SummaryModelSettings onOpenModels={() => openModels('summary')} onOpenExternalModels={() => openModels('external')} />
+              </TabsContent>
+              <TabsContent value="models">
+                <ModelsSettings section={modelsSection} onSectionChange={setModelsSection} browseSummaryOnOpen={browseSummaryOnOpen} browseTranscriptionOnOpen={browseTranscriptionOnOpen} />
+              </TabsContent>
+              <TabsContent value="permissions">
+                <PermissionsSettings onOpenModels={() => openModels('external')} />
+              </TabsContent>
+              <TabsContent value="storage">
+                <StorageSettings />
+              </TabsContent>
+              <TabsContent value="beta">
+                <BetaSettings />
+              </TabsContent>
+            </div>
           </Tabs>
         </div>
       </div>

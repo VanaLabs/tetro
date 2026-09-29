@@ -75,7 +75,11 @@ fn is_chat_model(model_id: &str) -> bool {
 /// # Returns
 /// Vector of models returned by the provider. Errors never masquerade as a verified catalog.
 #[command]
-pub async fn get_openai_models(api_key: Option<String>) -> Result<Vec<OpenAIModel>, String> {
+pub async fn get_openai_models(state: tauri::State<'_, crate::state::AppState>, api_key: Option<String>) -> Result<Vec<OpenAIModel>, String> {
+    let api_key = match api_key {
+        None => crate::database::repositories::setting::SettingsRepository::get_api_key(state.db_manager.pool(), "openai").await.map_err(|e| e.to_string())?,
+        value => value,
+    };
     let api_key = match api_key {
         Some(key) if !key.trim().is_empty() => key.trim().to_string(),
         _ => return Err("Connect OpenAI to check its summary models".to_string()),
@@ -95,7 +99,7 @@ pub async fn get_openai_models(api_key: Option<String>) -> Result<Vec<OpenAIMode
 
     // Fetch from API
     log::info!("Fetching OpenAI models from API...");
-    let client = reqwest::Client::new();
+    let client = crate::network_security::client()?;
 
     let response = match client
         .get("https://api.openai.com/v1/models")

@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useRouter } from 'next/navigation';
 import { Check, X } from 'lucide-react';
+import { openSummaryModelChoices } from '@/lib/model-settings-route';
 
 const DISMISS_KEY = 'tetro.setupGuideDismissed';
 type Status = { transcription: boolean; notes: boolean };
@@ -30,7 +31,7 @@ async function hasNotesModel() {
   return true;
 }
 
-/** A dismissible checklist for the selected transcription model and optional local notes. */
+/** A dismissible checklist for the selected transcription model and optional local summaries. */
 export function SetupGuide({ onChooseTranscription }: { onChooseTranscription: () => void }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status | null>(null);
@@ -54,11 +55,11 @@ export function SetupGuide({ onChooseTranscription }: { onChooseTranscription: (
 
   if (dismissed || !status || (status.transcription && status.notes)) return null;
   const dismiss = () => { setDismissed(true); try { localStorage.setItem(DISMISS_KEY, '1'); } catch {} };
-  const openNotesSettings = () => { sessionStorage.setItem('tetro.settingsTab', 'summaryModels'); router.push('/settings'); };
+  const openNotesSettings = () => openSummaryModelChoices(href => router.push(href));
 
   return <section className="tetro-setup" aria-label="Set up Tetro">
     <div className="tetro-setup-head">
-      <b>{status.transcription ? 'Add local notes when you’re ready' : 'Choose a transcription model to start'}</b>
+      <b>{status.transcription ? 'Add local summaries when you’re ready' : 'Choose a transcription model to start'}</b>
       <button className="tetro-icon" onClick={dismiss} aria-label="Hide setup tips" title="Hide setup tips"><X /></button>
     </div>
     <ol>
