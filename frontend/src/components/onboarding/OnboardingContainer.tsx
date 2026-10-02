@@ -49,7 +49,7 @@ export function OnboardingContainer({
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50 overflow-hidden">
+    <div className={cn("fixed inset-0 bg-gray-50 flex items-center justify-center z-50 overflow-hidden", styles.viewport)}>
       <div className={styles.themePicker} role="group" aria-label="Appearance">
         <button type="button" aria-pressed={theme === 'light'} onClick={() => setTheme('light')}>
           <Sun size={16} aria-hidden="true" /> Light

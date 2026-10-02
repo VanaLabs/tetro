@@ -1,5 +1,51 @@
 /* White glass chrome over the native macOS backdrop. Reading sheets stay solid.
    Non-native views and the existing dark theme keep their opaque surfaces. */
+html.tetro-native-glass {
+  --tetro-native-title-height:32px;
+}
+
+.tetro-native-titlebar {
+  display:none;
+}
+
+.tetro-native-glass .tetro-native-titlebar {
+  display:block;
+  position:fixed;
+  inset:0 0 auto;
+  height:var(--tetro-native-title-height);
+  z-index:40;
+  user-select:none;
+  background:var(--tetro-desk);
+}
+
+.tetro-native-glass .tetro-shell {
+  padding-top:var(--tetro-native-title-height);
+}
+
+/* The reserved title row must not push centered setup content above its scroller. */
+.tetro-native-glass .tetro-home .tetro-transcript-scroll:has(.tetro-ready-action) {
+  justify-content:safe center;
+}
+
+@media (max-height:600px) {
+  .tetro-native-glass .tetro-home .tetro-transcript-scroll:has(.tetro-ready-action) {
+    padding:8px 20px!important;
+  }
+
+  .tetro-native-glass .tetro-ready-action {
+    padding:0;
+  }
+
+  .tetro-native-glass .tetro-ready-settings {
+    margin-top:12px;
+    gap:6px;
+  }
+
+  .tetro-native-glass .tetro-ready-setting {
+    padding:8px 12px;
+  }
+}
+
 html.tetro-native-glass:not(.dark) {
   --tetro-glass-side:rgba(255,255,255,.12);
   --tetro-glass-chrome:rgba(255,255,255,.18);
@@ -11,6 +57,11 @@ html.tetro-native-glass:not(.dark) {
   --tetro-muted:#565750;
   --tetro-faint:#6f7068;
   background:transparent;
+}
+
+.tetro-native-glass:not(.dark) .tetro-native-titlebar {
+  background:var(--tetro-glass-chrome);
+  box-shadow:inset 0 1px 0 var(--tetro-glass-rim);
 }
 
 html.tetro-native-glass:not(.dark) body.tetro-app {
@@ -25,6 +76,12 @@ html.tetro-native-glass:not(.dark) body.tetro-app {
   background:var(--tetro-glass-side);
   border-right-color:var(--tetro-glass-line);
   box-shadow:inset -1px 0 0 var(--tetro-glass-rim);
+}
+
+.tetro-native-glass:not(.dark) .tetro-day-label {
+  background:var(--tetro-glass-side);
+  -webkit-backdrop-filter:blur(var(--tetro-glass-blur));
+  backdrop-filter:blur(var(--tetro-glass-blur));
 }
 
 .tetro-native-glass:not(.dark) .tetro-header {

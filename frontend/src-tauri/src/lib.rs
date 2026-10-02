@@ -494,9 +494,9 @@ pub fn run() {
     for window in &mut context.config_mut().app.windows {
         if window.label == "main" {
             window.transparent = true;
-            // The backdrop covers the webview, not a separate transparent title strip.
-            // Keep the native title/traffic lights on the standard title-bar surface.
-            window.title_bar_style = tauri::TitleBarStyle::Visible;
+            // Extend the content view and its native blur beneath the title bar.
+            // The frontend reserves the native controls' row with a draggable tint.
+            window.title_bar_style = tauri::TitleBarStyle::Overlay;
             window.window_effects = Some(
                 tauri::window::EffectsBuilder::new()
                     .effect(tauri::window::Effect::Sidebar)

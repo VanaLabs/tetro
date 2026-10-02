@@ -1,7 +1,10 @@
+.viewport {
+  top:var(--tetro-native-title-height,0px);
+}
 .shell {
   width:100%;
   max-width:720px;
-  height:100dvh;
+  height:calc(100dvh - var(--tetro-native-title-height,0px));
   display:flex;
   flex-direction:column;
   padding:24px 24px clamp(28px,6vh,88px);
