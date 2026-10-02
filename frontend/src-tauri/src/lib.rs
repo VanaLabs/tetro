@@ -486,6 +486,24 @@ pub fn get_language_preference_internal() -> Option<String> {
 }
 
 pub fn run() {
+    #[allow(unused_mut)]
+    let mut context = tauri::generate_context!();
+    // Native blur sits behind the webview; CSS keeps the reading panes opaque.
+    // Configure it before window creation and leave other platforms unchanged.
+    #[cfg(target_os = "macos")]
+    for window in &mut context.config_mut().app.windows {
+        if window.label == "main" {
+            window.transparent = true;
+            window.title_bar_style = tauri::TitleBarStyle::Transparent;
+            window.window_effects = Some(
+                tauri::window::EffectsBuilder::new()
+                    .effect(tauri::window::Effect::Sidebar)
+                    .state(tauri::window::EffectState::Active)
+                    .build(),
+            );
+        }
+    }
+
     log::set_max_level(log::LevelFilter::Info);
 
     let mut builder = tauri::Builder::default();
@@ -917,7 +935,7 @@ pub fn run() {
             audio::import::cancel_import_command,
             audio::import::is_import_in_progress_command,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while building tauri application")
         .run(|_app_handle, event| {
             match event {

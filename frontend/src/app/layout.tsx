@@ -9,6 +9,8 @@ import { MarkWatch, SilenceWatch } from '@/components/tetro/RecordingLevels'
 import { HoverHints } from '@/components/tetro/HoverHints'
 import './globals.css'
 import './tetro.css'
+import './glass.css'
+import { NativeGlass } from '@/components/tetro/NativeGlass'
 import { IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google'
 import Sidebar from '@/components/tetro/TetroSidebar'
 import { SidebarProvider } from '@/components/Sidebar/SidebarProvider'
@@ -270,6 +272,7 @@ export default function RootLayout({
       </head>
       <body className={`${sourceSans3.variable} ${tetroMono.variable} font-sans antialiased tetro-app`}>
         <StartupGuard><ThemeProvider>
+          <NativeGlass />
           <DeletedDraftCleanup />
             <RecordingStateProvider>
               <TetroIdentityBridge />
