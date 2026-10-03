@@ -485,38 +485,6 @@ pub fn get_language_preference_internal() -> Option<String> {
     LANGUAGE_PREFERENCE.lock().ok().map(|lang| lang.clone())
 }
 
-/// Reduce the material's opaque veil without fading the webview or its text.
-#[cfg(target_os = "macos")]
-fn soften_native_glass(window: &tauri::WebviewWindow) -> tauri::Result<()> {
-    let window = window.clone();
-    window.clone().run_on_main_thread(move || {
-        use objc::{class, msg_send, sel, sel_impl};
-        use objc::runtime::{Object, BOOL, YES};
-
-        // AppKit views are inspected and changed only on their owning main thread.
-        // Match the public effect-view class rather than a library-specific view tag.
-        objc::rc::autoreleasepool(|| unsafe {
-            let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
-            let reduced: BOOL = msg_send![workspace, accessibilityDisplayShouldReduceTransparency];
-            if reduced == YES {
-                return;
-            }
-            let Ok(view) = window.ns_view() else { return };
-            let view = view.cast::<Object>();
-            let subviews: *mut Object = msg_send![view, subviews];
-            let count: usize = msg_send![subviews, count];
-            for index in 0..count {
-                let subview: *mut Object = msg_send![subviews, objectAtIndex: index];
-                let is_effect: BOOL = msg_send![subview, isKindOfClass: class!(NSVisualEffectView)];
-                if is_effect == YES {
-                    let _: () = msg_send![subview, setAlphaValue: 0.72_f64];
-                    log::info!("Native glass material opacity: 0.72");
-                }
-            }
-        });
-    })
-}
-
 pub fn run() {
     #[allow(unused_mut)]
     let mut context = tauri::generate_context!();
@@ -571,10 +539,6 @@ pub fn run() {
         .manage(audio::init_system_audio_state())
         .manage(summary::summary_engine::ModelManagerState(Arc::new(tokio::sync::Mutex::new(None))))
         .setup(|_app| {
-            #[cfg(target_os = "macos")]
-            if let Some(window) = _app.get_webview_window("main") {
-                soften_native_glass(&window)?;
-            }
             app_profile::initialize(_app.handle())?;
             app_menu::install(_app)?;
             #[cfg(not(target_os = "windows"))]

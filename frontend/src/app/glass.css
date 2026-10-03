@@ -1,5 +1,5 @@
-/* Clear and smoked glass over the native macOS backdrop. Reading sheets stay solid.
-   Non-native views keep their opaque surfaces. */
+/* White glass chrome over the native macOS backdrop. Reading sheets stay solid.
+   Non-native views and the existing dark theme keep their opaque surfaces. */
 html.tetro-native-glass {
   --tetro-native-title-height:32px;
 }
@@ -51,104 +51,80 @@ html.tetro-native-glass {
   }
 }
 
-html.tetro-native-glass {
+html.tetro-native-glass:not(.dark) {
   --tetro-glass-side:rgba(255,255,255,.12);
-  --tetro-glass-chrome:rgba(255,255,255,.12);
-  --tetro-glass-control:rgba(255,255,255,.42);
-  --tetro-glass-dialog:rgba(250,250,248,.52);
-  --tetro-glass-overlay:rgba(35,38,38,.10);
+  --tetro-glass-chrome:rgba(255,255,255,.18);
+  --tetro-glass-control:rgba(255,255,255,.58);
+  --tetro-glass-dialog:rgba(250,250,248,.76);
   --tetro-glass-rim:rgba(255,255,255,.75);
   --tetro-glass-line:rgba(45,45,40,.14);
-  --tetro-glass-blur:18px;
+  --tetro-glass-blur:24px;
   --tetro-muted:#565750;
   --tetro-faint:#6f7068;
   background:transparent;
 }
 
-html.tetro-native-glass.dark {
-  --tetro-glass-side:rgba(14,18,22,.26);
-  --tetro-glass-chrome:rgba(14,18,22,.24);
-  --tetro-glass-control:rgba(58,64,70,.40);
-  --tetro-glass-dialog:rgba(24,28,32,.58);
-  --tetro-glass-overlay:rgba(0,0,0,.18);
-  --tetro-glass-rim:rgba(255,255,255,.18);
-  --tetro-glass-line:rgba(255,255,255,.15);
-  --tetro-muted:#9d9c96;
-  --tetro-faint:#6b6a65;
-}
-
-/* Keep stronger secondary text confined to chrome over a changing desktop. */
-.tetro-native-glass:not(.dark) :is(.tetro-sidebar,.tetro-header,.tetro-transport,.tetro-modal) {
-  --tetro-muted:#4c4e49;
-}
-
-.tetro-native-glass.dark :is(.tetro-sidebar,.tetro-header,.tetro-transport,.tetro-modal) {
-  --tetro-muted:#d2d8d4;
-  --tetro-faint:#d2d8d4;
-}
-
-.tetro-native-glass .tetro-native-titlebar {
+.tetro-native-glass:not(.dark) .tetro-native-titlebar {
   background:var(--tetro-glass-chrome);
   box-shadow:inset 0 1px 0 var(--tetro-glass-rim);
 }
 
-html.tetro-native-glass body.tetro-app {
+html.tetro-native-glass:not(.dark) body.tetro-app {
   background:transparent;
 }
 
-.tetro-native-glass :is(.tetro-shell,.tetro-main) {
+.tetro-native-glass:not(.dark) :is(.tetro-shell,.tetro-main) {
   background:transparent;
 }
 
-.tetro-native-glass .tetro-sidebar {
+.tetro-native-glass:not(.dark) .tetro-sidebar {
   background:var(--tetro-glass-side);
   border-right-color:var(--tetro-glass-line);
   box-shadow:inset -1px 0 0 var(--tetro-glass-rim);
 }
 
-.tetro-native-glass .tetro-day-label {
-  background:transparent;
+.tetro-native-glass:not(.dark) .tetro-day-label {
+  background:var(--tetro-glass-side);
   -webkit-backdrop-filter:blur(var(--tetro-glass-blur));
   backdrop-filter:blur(var(--tetro-glass-blur));
 }
 
-.tetro-native-glass .tetro-header {
+.tetro-native-glass:not(.dark) .tetro-header {
   background:var(--tetro-glass-chrome);
 }
 
-.tetro-native-glass .tetro-transport {
+.tetro-native-glass:not(.dark) .tetro-transport {
   background:var(--tetro-glass-chrome);
   border-top-color:var(--tetro-glass-line);
   box-shadow:inset 0 1px 0 var(--tetro-glass-rim);
 }
 
-.tetro-native-glass :is(.tetro-search,.tetro-sidebar-bottom,.tetro-input-toggle) {
+.tetro-native-glass:not(.dark) :is(.tetro-search,.tetro-sidebar-bottom,.tetro-input-toggle) {
   background:var(--tetro-glass-control);
   border-color:var(--tetro-glass-line);
   box-shadow:inset 0 1px 0 var(--tetro-glass-rim),0 1px 2px rgba(25,25,20,.04);
 }
 
-.tetro-native-glass .tetro-keybank {
+.tetro-native-glass:not(.dark) .tetro-keybank {
   background:var(--tetro-glass-control)!important;
   box-shadow:inset 0 0 0 1px var(--tetro-glass-line),inset 0 1px 0 var(--tetro-glass-rim)!important;
 }
 
-.tetro-native-glass .tetro-app .tetro-modal-overlay {
-  background:var(--tetro-glass-overlay)!important;
+.tetro-native-glass:not(.dark) .tetro-app .tetro-modal-overlay {
+  background:rgba(35,38,38,.13)!important;
 }
 
-.tetro-native-glass .tetro-app .tetro-modal {
+.tetro-native-glass:not(.dark) .tetro-app .tetro-modal {
   background:var(--tetro-glass-dialog);
   border-color:var(--tetro-glass-rim);
-  box-shadow:inset 0 1px 0 var(--tetro-glass-rim),0 18px 50px -12px rgba(0,0,0,.35),0 0 0 1px var(--tetro-glass-line);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 18px 50px -12px rgba(25,30,30,.25),0 0 0 1px rgba(45,45,40,.08);
   -webkit-backdrop-filter:blur(var(--tetro-glass-blur)) saturate(1.15);
   backdrop-filter:blur(var(--tetro-glass-blur)) saturate(1.15);
 }
 
 /* Keep the interface predictable when people request solid, higher-contrast UI. */
 @media (prefers-reduced-transparency:reduce), (prefers-contrast:more) {
-  html.tetro-native-glass,
-  html.tetro-native-glass.dark {
+  html.tetro-native-glass:not(.dark) {
     --tetro-glass-side:var(--tetro-side);
     --tetro-glass-chrome:var(--tetro-desk);
     --tetro-glass-control:var(--tetro-panel);
@@ -158,16 +134,12 @@ html.tetro-native-glass body.tetro-app {
     --tetro-glass-blur:0px;
   }
 
-  html.tetro-native-glass body.tetro-app,
-  .tetro-native-glass :is(.tetro-shell,.tetro-main) {
+  html.tetro-native-glass:not(.dark) body.tetro-app,
+  .tetro-native-glass:not(.dark) :is(.tetro-shell,.tetro-main) {
     background:var(--tetro-desk);
   }
 
-  .tetro-native-glass .tetro-app .tetro-modal-overlay {
+  .tetro-native-glass:not(.dark) .tetro-app .tetro-modal-overlay {
     background:rgba(20,20,19,.55)!important;
-  }
-
-  .tetro-native-glass .tetro-day-label {
-    background:var(--tetro-side);
   }
 }
