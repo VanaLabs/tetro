@@ -1,6 +1,6 @@
 [package]
 name = "tetro"
-version = "9.1.5"
+version = "9.1.6"
 description = "Tetro desktop meeting recorder, transcription and notes"
 authors = ["Sujith S", "Vana Labs"]
 license = "MIT"

@@ -6875,7 +6875,7 @@ dependencies = [
 
 [[package]]
 name = "tetro"
-version = "9.1.5"
+version = "9.1.6"
 dependencies = [
  "anyhow",
  "async-trait",
