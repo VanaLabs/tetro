@@ -22,6 +22,20 @@ html.tetro-native-glass {
   padding-top:var(--tetro-native-title-height);
 }
 
+/* Startup alone uses the whole native backdrop, including in the dark theme. */
+html.tetro-native-glass:has(.tetro-loading),
+html.tetro-native-glass:has(.tetro-loading) body.tetro-app {
+  background:transparent;
+}
+
+.tetro-native-glass .tetro-loading {
+  background:rgba(250,250,248,.12);
+}
+
+.tetro-native-glass.dark .tetro-loading {
+  background:rgba(16,18,20,.24);
+}
+
 /* Release the entrance animation's compositing layer once paper is visible. */
 .tetro-native-glass :is(.tetro-sheet,.tetro-settings-sheet,.tetro-template-columns nav,.tetro-template-columns article) {
   animation-fill-mode:backwards;
@@ -122,8 +136,21 @@ html.tetro-native-glass:not(.dark) body.tetro-app {
   backdrop-filter:blur(var(--tetro-glass-blur)) saturate(1.15);
 }
 
+/* The startup backdrop continues beneath the native title row. */
+.tetro-native-glass:has(.tetro-loading) .tetro-native-titlebar {
+  background:transparent;
+  box-shadow:none;
+}
+
 /* Keep the interface predictable when people request solid, higher-contrast UI. */
 @media (prefers-reduced-transparency:reduce), (prefers-contrast:more) {
+  html.tetro-native-glass:has(.tetro-loading),
+  html.tetro-native-glass:has(.tetro-loading) body.tetro-app,
+  .tetro-native-glass .tetro-loading,
+  .tetro-native-glass.dark .tetro-loading {
+    background:var(--tetro-desk);
+  }
+
   html.tetro-native-glass:not(.dark) {
     --tetro-glass-side:var(--tetro-side);
     --tetro-glass-chrome:var(--tetro-desk);

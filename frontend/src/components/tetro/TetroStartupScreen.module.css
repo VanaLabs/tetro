@@ -1,0 +1,9 @@
+.screen {
+  position:fixed;
+  inset:0;
+  z-index:30;
+  display:grid;
+  place-items:center;
+  padding:calc(var(--tetro-native-title-height,0px) + 24px) 24px 24px;
+  background:var(--tetro-desk);
+}

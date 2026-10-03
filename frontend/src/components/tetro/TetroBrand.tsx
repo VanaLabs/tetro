@@ -42,7 +42,7 @@ export function TetroWordmark({ className = '', bars = [] }: { className?: strin
   </span>;
 }
 
-export function TetroBrand({ variant = 'sidebar', state = 'idle', level = 0, motion = true, bars = [] }: SignalProps & { variant?: 'sidebar' | 'about' | 'welcome' | 'onboarding'; bars?: number[] }) {
+export function TetroBrand({ variant = 'sidebar', state = 'idle', level = 0, motion = true, bars = [] }: SignalProps & { variant?: 'sidebar' | 'about' | 'welcome' | 'onboarding' | 'startup'; bars?: number[] }) {
   return <span className={`${styles.lockup} ${styles[variant]}`} data-state={state} data-motion={motion ? 'on' : 'off'} style={{ '--brand-energy': level } as CSSProperties} aria-hidden="true">
     <TetroWordmark bars={bars} />
   </span>;

@@ -261,6 +261,9 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
+                if ('__TAURI_INTERNALS__' in window && navigator.platform.startsWith('Mac')) {
+                  document.documentElement.classList.add('tetro-native-glass');
+                }
                 var t = window.localStorage.getItem('tetro-theme') || window.localStorage.getItem('meetily-theme');
                 if (t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                   document.documentElement.classList.add('dark');
@@ -271,8 +274,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`${sourceSans3.variable} ${tetroMono.variable} font-sans antialiased tetro-app`}>
-        <StartupGuard><ThemeProvider>
+        <ThemeProvider>
           <NativeGlass />
+          <StartupGuard>
           <DeletedDraftCleanup />
             <RecordingStateProvider>
               <TetroIdentityBridge />
@@ -322,7 +326,8 @@ export default function RootLayout({
             </RecordingStateProvider>
 
           <ThemedToaster />
-        </ThemeProvider></StartupGuard>
+          </StartupGuard>
+        </ThemeProvider>
       </body>
     </html>
   )
