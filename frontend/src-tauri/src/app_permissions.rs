@@ -112,24 +112,59 @@ pub async fn test_system_audio_access() -> Result<&'static str, String> {
 }
 
 pub(crate) async fn probe_system_audio_access(timeout: std::time::Duration) -> Result<&'static str, String> {
-    let _guard = AUDIO_TEST.try_lock().map_err(|_| "An audio access test is already running")?;
+    let guard = AUDIO_TEST.try_lock().map_err(|_| "An audio access test is already running")?;
     if crate::audio::recording_commands::get_recording_state().await["is_active"].as_bool().unwrap_or(false) {
         return Err("Finish the recording before testing audio access".into());
     }
     #[cfg(target_os = "macos")]
     {
-        tokio::task::spawn_blocking(move || {
+        run_bounded_audio_probe(guard, timeout, || {
             // Stream creation alone is not permission proof: denied taps can deliver silence.
             // Samples are inspected in memory and discarded, never saved or transcribed.
             let capture = crate::audio::capture::CoreAudioCapture::new().map_err(|_| "Could not start the audio test. Check Audio Capture in System Settings.")?;
-            let stream = capture.stream().map_err(|_| "Could not start the audio test. Check Audio Capture in System Settings.")?;
-            // The stream owns the started device/tap. Dropping it on every outcome
-            // stops capture before the command returns; no meeting or file is created.
-            tauri::async_runtime::block_on(verify_audio_stream(stream, timeout))
-        }).await.map_err(|_| "Audio test did not complete".to_string())?
+            capture.stream().map_err(|_| "Could not start the audio test. Check Audio Capture in System Settings.".to_string())
+        }).await
     }
     #[cfg(not(target_os = "macos"))]
-    { let _ = timeout; Ok("unknown") }
+    { let _ = (guard, timeout); Ok("unknown") }
+}
+
+// AudioDeviceStart is synchronous and can stall before any stream exists. Bound
+// the caller's whole test, not just callbacks after startup. A native call cannot
+// be interrupted: the worker retains the lock and drops a late stream when it
+// returns, so retries cannot accumulate overlapping captures.
+#[cfg(any(target_os = "macos", test))]
+async fn run_bounded_audio_probe<G, F, S>(guard: G, timeout: std::time::Duration, start: F) -> Result<&'static str, String>
+where
+    G: Send + 'static,
+    F: FnOnce() -> Result<S, String> + Send + 'static,
+    S: futures_util::Stream<Item = f32> + Unpin,
+{
+    use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+    struct CancelOnDrop(Arc<AtomicBool>);
+    impl Drop for CancelOnDrop {
+        fn drop(&mut self) { self.0.store(true, Ordering::Release); }
+    }
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let _cancel_on_drop = CancelOnDrop(cancelled.clone());
+    let deadline = std::time::Instant::now() + timeout;
+    let worker = tokio::task::spawn_blocking(move || {
+        let _guard = guard;
+        if cancelled.load(Ordering::Acquire) || std::time::Instant::now() >= deadline {
+            return Ok("inconclusive");
+        }
+        let stream = start()?;
+        if cancelled.load(Ordering::Acquire) { return Ok("inconclusive"); }
+        let Some(remaining) = deadline.checked_duration_since(std::time::Instant::now()) else {
+            return Ok("inconclusive");
+        };
+        // Stream ownership releases capture on success, timeout, or cancellation.
+        tauri::async_runtime::block_on(verify_audio_stream(stream, remaining))
+    });
+    match tokio::time::timeout(timeout, worker).await {
+        Ok(result) => result.map_err(|_| "Audio test did not complete".to_string())?,
+        Err(_) => Ok("inconclusive"),
+    }
 }
 
 #[tauri::command]
@@ -165,7 +200,8 @@ async fn verify_audio_stream<S: futures_util::Stream<Item = f32> + Unpin>(
 
 #[cfg(test)]
 mod audio_access_tests {
-    use super::verify_audio_stream;
+    use super::{run_bounded_audio_probe, verify_audio_stream};
+    use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
     use std::time::Duration;
 
     #[tokio::test]
@@ -196,5 +232,63 @@ mod audio_access_tests {
         let dropped = Arc::new(AtomicBool::new(false));
         assert_eq!(verify_audio_stream(PendingCapture(dropped.clone()), Duration::from_millis(5)).await.unwrap(), "inconclusive");
         assert!(dropped.load(Ordering::SeqCst));
+    }
+
+    struct LateCapture { polled: Arc<AtomicBool>, dropped: Arc<AtomicBool> }
+    impl futures_util::Stream for LateCapture {
+        type Item = f32;
+        fn poll_next(self: std::pin::Pin<&mut Self>, _: &mut std::task::Context<'_>) -> std::task::Poll<Option<f32>> {
+            self.polled.store(true, Ordering::SeqCst);
+            std::task::Poll::Ready(Some(0.1))
+        }
+    }
+    impl Drop for LateCapture {
+        fn drop(&mut self) { self.dropped.store(true, Ordering::SeqCst); }
+    }
+
+    async fn delayed_start_releases_without_polling(cancel: bool) {
+        let lock = Arc::new(tokio::sync::Mutex::new(()));
+        let guard = lock.clone().lock_owned().await;
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let polled = Arc::new(AtomicBool::new(false));
+        let dropped = Arc::new(AtomicBool::new(false));
+        let capture = LateCapture { polled: polled.clone(), dropped: dropped.clone() };
+        let caller = tokio::spawn(run_bounded_audio_probe(guard, if cancel { Duration::from_secs(1) } else { Duration::from_millis(30) }, move || {
+            let _ = started_tx.send(());
+            release_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            Ok(capture)
+        }));
+        started_rx.await.unwrap();
+        if cancel {
+            caller.abort();
+            assert!(caller.await.unwrap_err().is_cancelled());
+        } else {
+            assert_eq!(tokio::time::timeout(Duration::from_secs(1), caller).await.unwrap().unwrap().unwrap(), "inconclusive");
+        }
+        // Returning/aborting the UI request must not unlock a still-starting tap.
+        assert!(lock.try_lock().is_err());
+        release_tx.send(()).unwrap();
+        let _released = tokio::time::timeout(Duration::from_secs(1), lock.lock()).await.unwrap();
+        assert!(dropped.load(Ordering::SeqCst));
+        assert!(!polled.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn startup_timeout_keeps_lock_and_discards_late_audio() {
+        delayed_start_releases_without_polling(false).await;
+    }
+
+    #[tokio::test]
+    async fn cancelled_caller_keeps_lock_and_discards_late_audio() {
+        delayed_start_releases_without_polling(true).await;
+    }
+
+    #[tokio::test]
+    async fn bounded_probe_verifies_real_samples_and_releases_lock() {
+        let lock = Arc::new(tokio::sync::Mutex::new(()));
+        let guard = lock.clone().lock_owned().await;
+        assert_eq!(run_bounded_audio_probe(guard, Duration::from_secs(1), || Ok(futures_util::stream::iter([0.1]))).await.unwrap(), "verified");
+        assert!(lock.try_lock().is_ok());
     }
 }

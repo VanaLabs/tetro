@@ -1,5 +1,5 @@
-//! Tetro's waveform identity across the menu bar and macOS Dock.
-//! Recording uses measured audio energy; processing uses a bounded opacity sequence.
+//! Tetro's interlocking T identity across the menu bar and macOS Dock.
+//! Central status windows pulse without changing the T; processing uses a bounded rotation sequence.
 //! A generation token cancels queued frames immediately when state or motion preference changes.
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
@@ -96,9 +96,10 @@ fn meter(peak: f32) -> f32 {
 
 fn follow_level(current: f32, previous: f32) -> f32 { current.max(previous * 0.55) }
 
-const PULSE_FRAMES: usize = 16; // Two seconds at the menu bar's 8Hz refresh rate.
-fn pulse_phase(mode: Mode, step: usize, reduced: bool) -> Option<usize> {
-    if mode == Mode::Recording && !reduced { Some(step % PULSE_FRAMES) } else { None }
+// 24 seconds is the shared cycle of the 1.6s red and 3s green pulses at 8Hz.
+const PULSE_FRAMES: usize = 192;
+fn pulse_phase(mode: Mode, step: usize, reduced: bool, call: bool) -> Option<usize> {
+    if !reduced && (mode == Mode::Recording || (mode == Mode::Idle && call)) { Some(step % PULSE_FRAMES) } else { None }
 }
 
 fn frame(mode: Mode, step: usize, level: f32) -> (&'static [u8], usize) {
@@ -155,7 +156,7 @@ pub fn initialize<R: Runtime>(app: &AppHandle<R>) {
         }
     });
     refresh(app);
-    // Static meeting artwork must also follow a menu-bar appearance change.
+    // Colored meeting artwork must also follow a menu-bar appearance change.
     // Query the status button's actual appearance, independent of app theme.
     #[cfg(target_os = "macos")]
     {
@@ -194,13 +195,14 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
     let generation = GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let mode = visual_mode(mode_from(BACKEND.load(Ordering::SeqCst)), FRONTEND_BUSY.load(Ordering::SeqCst));
     let reduced = REDUCE_MOTION.load(Ordering::SeqCst);
+    let call = crate::call_detection::call_active();
     let name = crate::app_profile::NAME;
     let status = match mode { Mode::Idle if crate::call_detection::call_active() => "Microphone in use · Record this call", Mode::Idle => "Ready", Mode::Starting => "Starting recording", Mode::Recording => "Recording", Mode::Paused => "Recording paused", Mode::Working => "Processing recording" };
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(format!("{name} · {status}")));
     }
     show_frame(app, mode, 0, if reduced { 1.0 } else { 0.0 }, generation, true);
-    if reduced || matches!(mode, Mode::Idle | Mode::Paused) { return; }
+    if reduced || mode == Mode::Paused || (mode == Mode::Idle && !call) { return; }
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -214,7 +216,7 @@ fn refresh<R: Runtime>(app: &AppHandle<R>) {
             step += 1;
             energy = follow_level(f32::from_bits(LEVEL.load(Ordering::Relaxed)), energy);
             let (_, index) = frame(mode, step, energy);
-            let key = (index, pulse_phase(mode, step, false));
+            let key = (index, pulse_phase(mode, step, false, call));
             let update_dock = step % 2 == 0 && key != last_dock;
             if key != last_frame || update_dock {
                 // Dock refresh is capped at 4Hz; the menu bar may update at 8Hz.
@@ -231,7 +233,7 @@ fn show_frame<R: Runtime>(app: &AppHandle<R>, mode: Mode, step: usize, level: f3
     let call = crate::call_detection::call_active();
     let _ = app.run_on_main_thread(move || {
         if GENERATION.load(Ordering::SeqCst) != generation { return; }
-        let pulse = pulse_phase(mode, step, REDUCE_MOTION.load(Ordering::SeqCst));
+        let pulse = pulse_phase(mode, step, REDUCE_MOTION.load(Ordering::SeqCst), call);
         if let Some(tray) = handle.tray_by_id("main-tray") {
             let dark = menu_bar_is_dark(&tray);
             #[cfg(target_os = "macos")]
@@ -239,10 +241,11 @@ fn show_frame<R: Runtime>(app: &AppHandle<R>, mode: Mode, step: usize, level: f3
             let (rgba, _) = tray_frame(mode, step, level, call, dark);
             let icon = if mode == Mode::Recording {
                 let (_, index) = frame(mode, step, level);
-                let base = if dark { LIVE_DARK[0] } else { LIVE[0] };
+                let base: &[u8] = if dark { include_bytes!("../icons/letter/idle-dark.rgba") } else { include_bytes!("../icons/letter/idle.rgba") };
                 tauri::image::Image::new_owned(recording_artwork::tray(base, index - 2, dark, pulse), 36, 36)
             } else if mode == Mode::Idle && call {
-                tauri::image::Image::new_owned(recording_artwork::meeting_tray(rgba, dark), 36, 36)
+                let base: &[u8] = if dark { include_bytes!("../icons/letter/idle-dark.rgba") } else { include_bytes!("../icons/letter/idle.rgba") };
+                tauri::image::Image::new_owned(recording_artwork::meeting_tray(base, dark, pulse), 36, 36)
             } else { tauri::image::Image::new(rgba, 36, 36) };
             let _ = tray.set_icon(Some(icon));
             let _ = tray.set_icon_as_template(uses_template(mode, call));
@@ -315,14 +318,15 @@ fn set_dock_icon(index: usize, pulse: Option<usize>) {
                 }
             }
             let image = cache.entry(key).or_insert_with(|| {
-                // Grow the bars over the approved quiet frame, preserving its gradient,
-                // central stem and recording badge. Cache each completed native image.
-                let bytes = DOCK[if (2..10).contains(&index) { 2 } else { index }];
+                // Paint only inside the idle mark's opening, then cache the native image.
+                let bytes = DOCK[if (2..10).contains(&index) || index == 22 { 0 } else { index }];
                 let data: *mut Object = msg_send![class!(NSData), dataWithBytes:bytes.as_ptr() length:bytes.len()];
                 let allocated: *mut Object = msg_send![class!(NSImage), alloc];
                 let image: *mut Object = msg_send![allocated, initWithData:data];
                 if !image.is_null() && (2..10).contains(&index) {
                     recording_artwork::draw_dock(image, index - 2, pulse);
+                } else if !image.is_null() && index == 22 {
+                    recording_artwork::draw_meeting_dock(image, pulse);
                 }
                 NativeImage(image, std::time::Instant::now())
             });
@@ -381,19 +385,24 @@ mod tests {
         assert!(meter(0.25) > 0.99, "normal speech peaks should reach the full artwork range");
     }
     #[test]
-    fn waveform_falls_promptly_after_audio_stops() {
+    fn indicator_energy_falls_promptly_after_audio_stops() {
         let mut energy = 1.0;
         for _ in 0..4 { energy = follow_level(0.0, energy); }
-        assert!(energy < 0.1, "waveform should settle in half a second");
+        assert!(energy < 0.1, "indicator should settle in half a second");
         assert_eq!(follow_level(0.9, 0.1), 0.9);
     }
     #[test]
-    fn pulse_continues_at_constant_audio_but_stops_for_pause_and_reduce_motion() {
-        assert_ne!(pulse_phase(Mode::Recording, 0, false), pulse_phase(Mode::Recording, 1, false));
-        assert_eq!(pulse_phase(Mode::Recording, PULSE_FRAMES, false), Some(0));
-        assert_eq!(pulse_phase(Mode::Recording, 1, true), None);
+    fn status_pulses_only_during_recording_or_a_detected_call_and_respect_reduce_motion() {
+        for (mode, call) in [(Mode::Recording, false), (Mode::Recording, true), (Mode::Idle, true)] {
+            assert_ne!(pulse_phase(mode, 0, false, call), pulse_phase(mode, 1, false, call));
+            assert_eq!(pulse_phase(mode, PULSE_FRAMES, false, call), Some(0));
+            assert_eq!(pulse_phase(mode, 1, true, call), None);
+        }
         for mode in [Mode::Idle, Mode::Paused, Mode::Starting, Mode::Working] {
-            assert_eq!(pulse_phase(mode, 1, false), None);
+            assert_eq!(pulse_phase(mode, 1, false, false), None);
+        }
+        for mode in [Mode::Paused, Mode::Starting, Mode::Working] {
+            assert_eq!(pulse_phase(mode, 1, false, true), None);
         }
     }
     #[test]

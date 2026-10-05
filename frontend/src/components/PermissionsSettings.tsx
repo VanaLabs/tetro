@@ -18,6 +18,8 @@ export function PermissionsSettings({ onOpenModels }: { onOpenModels?: () => voi
   const [keys, setKeys] = useState<'unchecked' | 'available' | 'empty' | 'unavailable'>('unchecked');
   const mounted = useRef(true);
   const refreshing = useRef(false);
+  const busy = useRef(false);
+  const sound = useRef<HTMLAudioElement | null>(null);
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
     refreshing.current = true;
@@ -37,19 +39,61 @@ export function PermissionsSettings({ onOpenModels }: { onOpenModels?: () => voi
   useEffect(() => {
     mounted.current = true;
     void refresh();
-    const onFocus = () => { setAudio('unchecked'); setKeys('unchecked'); void refresh(); };
+    const onFocus = () => { if (!busy.current) setKeys('unchecked'); void refresh(); };
     window.addEventListener('focus', onFocus);
-    return () => { mounted.current = false; window.removeEventListener('focus', onFocus); };
+    return () => {
+      mounted.current = false;
+      window.removeEventListener('focus', onFocus);
+      sound.current?.pause();
+      sound.current = null;
+    };
   }, [refresh]);
 
   const run = async (id: string, work: () => Promise<void>) => {
+    if (busy.current) return;
+    busy.current = true;
     setPending(id); setError('');
     try { await work(); }
     catch (e) { if (mounted.current) setError(String(e)); }
-    finally { if (mounted.current) setPending(undefined); }
+    finally { busy.current = false; if (mounted.current) setPending(undefined); }
   };
   const openSettings = (permission: string) => run(permission, async () => {
+    if (permission === 'system_audio') setAudio('unchecked');
     await invoke('open_app_permission_settings', { permission });
+  });
+  const testAudio = () => run('system_audio', async () => {
+    setAudio('unchecked');
+    sound.current?.pause();
+    // Start inside the click gesture, before native capture warms up the device.
+    const signal = new Audio('/tetro/audio-access-test.wav');
+    signal.loop = true;
+    sound.current = signal;
+    let playbackFailed = false;
+    let verified = false;
+    let playbackTimer: ReturnType<typeof setTimeout> | undefined;
+    // Start in the gesture, then wait for playback readiness before capture.
+    // Bound media startup too, so a stalled player cannot leave the UI waiting.
+    const playback = signal.play().catch(() => { playbackFailed = true; });
+    try {
+      await Promise.race([
+        playback,
+        new Promise<never>((_, reject) => { playbackTimer = setTimeout(() => reject(new Error('The test sound couldn’t start. Try again.')), 1000); }),
+      ]);
+      clearTimeout(playbackTimer);
+      if (!mounted.current) return;
+      const result = await invoke<string>('test_system_audio_access');
+      verified = result === 'verified';
+      if (mounted.current) {
+        setAudio(verified ? 'verified' : 'inconclusive');
+        if (!verified && playbackFailed) setError('The test sound couldn’t play. Try again, or play some audio while testing.');
+      }
+    } finally {
+      clearTimeout(playbackTimer);
+      // Let a successful coin sound finish once, as in onboarding. Stop on failure
+      // or unmount; a later click also stops any remaining sound before replaying.
+      if (verified && mounted.current) signal.loop = false;
+      else { signal.pause(); if (sound.current === signal) sound.current = null; }
+    }
   });
   const request = (permission: 'microphone' | 'notifications') => run(permission, async () => {
     const status = await invoke<Access>('request_app_permission', { permission });
@@ -73,11 +117,8 @@ export function PermissionsSettings({ onOpenModels }: { onOpenModels?: () => voi
     {snapshot && snapshot.platform !== 'macos' && <p className="tetro-setting-note">Permission checks are available on macOS. On this system, manage access in your operating system settings.</p>}
     <SettingGroup title="Recording">
       {nativeRow('microphone', 'Microphone', 'Records your voice. If access was denied, enable Tetro in Privacy & Security → Microphone.')}
-      <SettingRow label={<>Computer audio<span className="tetro-permission-status" role="status">{pending === 'system_audio' ? 'Listening for audio…' : audio === 'verified' ? 'Audio received' : audio === 'inconclusive' ? 'Couldn’t verify' : 'Not checked'}</span></>} hint="Play some audio, then test. Tetro listens for up to six seconds and discards the samples. Silence can mean access is off or nothing is playing.">
-        <button type="button" className="tetro-key" disabled={!!pending || recording || loading} onClick={() => void run('system_audio', async () => {
-          const result = await invoke<string>('test_system_audio_access');
-          if (mounted.current) setAudio(result === 'verified' ? 'verified' : 'inconclusive');
-        })}>{pending === 'system_audio' ? 'Testing…' : 'Test access'}</button>
+      <SettingRow label={<>Computer audio<span className="tetro-permission-status" role="status">{pending === 'system_audio' ? 'Testing audio…' : audio === 'verified' ? 'Audio received' : audio === 'inconclusive' ? 'Couldn’t verify' : 'Not checked'}</span></>} hint="Tetro plays a quiet test sound and checks audio access for up to six seconds. Nothing is saved.">
+        <button type="button" className="tetro-key" disabled={!!pending || recording || loading} onClick={() => void testAudio()}>{pending === 'system_audio' ? 'Testing…' : 'Test access'}</button>
         <button type="button" className="tetro-key" disabled={!!pending || loading} onClick={() => void openSettings('system_audio')}>System Settings</button>
       </SettingRow>
     </SettingGroup>

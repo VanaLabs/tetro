@@ -1,74 +1,45 @@
-//! Native recording overlays. The supplied logo/background assets remain unchanged.
+//! Status indicators stay inside the interlocking T's central window.
 
-const BADGE_X: f32 = 28.5;
-const BADGE_Y: f32 = 29.0;
-const BADGE_RADIUS: f32 = 5.3;
+const CENTER_X: f32 = 18.125;
+const CENTER_Y: f32 = 10.75;
 
-fn height(quiet: f32, loud: f32, frame: usize) -> f32 {
-    quiet + (loud - quiet) * frame.min(7) as f32 / 7.0
-}
-
-/// Retain the quiet frame's stem; extend its bars and outline its recording dot.
-pub(super) fn tray(base: &[u8], frame: usize, dark: bool, phase: Option<usize>) -> Vec<u8> {
-    let mut pixels = vec![0; base.len()];
-    if let Some(phase) = phase {
-        let (progress, opacity) = pulse(phase);
-        let radius = BADGE_RADIUS + progress * 1.4;
-        paint(&mut pixels, [255, 59, 48], opacity, |x, y| (x - BADGE_X).powi(2) + (y - BADGE_Y).powi(2) <= radius * radius);
-    }
-    copy_without_badge(base, &mut pixels);
-    let ink = if dark { [255, 255, 255] } else { [23, 25, 27] };
-    for (x, quiet, loud) in [(2.0, 3.0, 13.0), (6.9, 3.5, 16.0), (11.8, 4.0, 20.0),
-        (21.6, 4.0, 20.0), (26.5, 3.5, 16.0), (31.4, 3.0, 13.0)] {
-        let h = height(quiet, loud, frame);
-        paint(&mut pixels, ink, 1.0, |px, py| {
-            let dy = (py - 10.5).abs() - (h / 2.0 - 1.3);
-            (px - (x + 1.3)).powi(2) + dy.max(0.0).powi(2) <= 1.3 * 1.3
-        });
-    }
-    badge(&mut pixels, [255, 59, 48]);
+/// The entire opening stays colored and breathes; the selected T remains fixed.
+pub(super) fn tray(base: &[u8], _frame: usize, _dark: bool, phase: Option<usize>) -> Vec<u8> {
+    let mut pixels = base.to_vec();
+    window(&mut pixels, [255, 59, 48], opacity(phase, 1.6));
     pixels
 }
 
-/// Meeting and recording use the same compact placement and contrast treatment.
-pub(super) fn meeting_tray(base: &[u8], dark: bool) -> Vec<u8> {
-    let mut pixels = vec![0; base.len()];
-    copy_without_badge(base, &mut pixels);
-    badge(&mut pixels, if dark { [48, 209, 88] } else { [40, 177, 76] });
+pub(super) fn meeting_tray(base: &[u8], dark: bool, phase: Option<usize>) -> Vec<u8> {
+    let mut pixels = base.to_vec();
+    window(&mut pixels, if dark { [48, 209, 88] } else { [40, 177, 76] }, opacity(phase, 3.0));
     pixels
 }
 
-fn copy_without_badge(base: &[u8], pixels: &mut [u8]) {
-    // Preserve the supplied T above any halo. Clear only the old badge area,
-    // leaving a transparent gap to the stem and the fully extended waveform.
-    for (index, source) in base.chunks_exact(4).enumerate() {
-        let x = index % 36;
-        let y = index / 36;
-        if x >= 21 && y >= 20 { continue; }
-        blend(&mut pixels[index * 4..][..4], [source[0], source[1], source[2]], source[3] as f32 / 255.0);
-    }
-}
-
-fn badge(pixels: &mut [u8], color: [u8; 3]) {
-    // White separates either color from translucent wallpaper; the thin dark edge
-    // also keeps that ring readable against a light or highlighted menu bar.
-    for (radius, color) in [(BADGE_RADIUS, [23, 25, 27]), (4.7, [255, 255, 255]), (3.5, color)] {
-        paint(pixels, color, 1.0, |x, y| (x - BADGE_X).powi(2) + (y - BADGE_Y).powi(2) <= radius * radius);
-    }
-}
-
-/// Four samples per pixel keep rounded strokes crisp at 18pt without a new renderer.
-fn paint(pixels: &mut [u8], color: [u8; 3], opacity: f32, inside: impl Fn(f32, f32) -> bool) {
+/// Four samples per pixel retain crisp edges at an 18pt menu-bar size.
+fn window(pixels: &mut [u8], color: [u8; 3], opacity: f32) {
     for y in 0..36 {
         for x in 0..36 {
-            let mut samples = 0;
+            let (mut edge, mut fill) = (0, 0);
             for dy in [0.25, 0.75] {
-                for dx in [0.25, 0.75] { samples += inside(x as f32 + dx, y as f32 + dy) as u8; }
+                for dx in [0.25, 0.75] {
+                    edge += inside_window(x as f32 + dx, y as f32 + dy, 0.12) as u8;
+                    fill += inside_window(x as f32 + dx, y as f32 + dy, 0.45) as u8;
+                }
             }
-            if samples == 0 { continue; }
-            blend(&mut pixels[(y * 36 + x) * 4..][..4], color, samples as f32 / 4.0 * opacity);
+            let pixel = &mut pixels[(y * 36 + x) * 4..][..4];
+            blend(pixel, [250, 249, 246], edge as f32 / 4.0);
+            blend(pixel, color, fill as f32 / 4.0 * opacity);
         }
     }
+}
+
+fn inside_window(x: f32, y: f32, inset: f32) -> bool {
+    let (half_width, half_height, radius) = (5.375 - inset, 3.25 - inset, 1.0 - inset);
+    let (dx, dy) = ((x - CENTER_X).abs(), (y - CENTER_Y).abs());
+    if dx > half_width || dy > half_height { return false; }
+    let (corner_x, corner_y) = ((dx - half_width + radius).max(0.0), (dy - half_height + radius).max(0.0));
+    corner_x * corner_x + corner_y * corner_y <= radius * radius
 }
 
 fn blend(pixel: &mut [u8], color: [u8; 3], coverage: f32) {
@@ -79,45 +50,47 @@ fn blend(pixel: &mut [u8], color: [u8; 3], coverage: f32) {
     pixel[3] = (alpha * 255.0).round() as u8;
 }
 
-fn pulse(phase: usize) -> (f32, f32) {
-    let progress = (phase % super::PULSE_FRAMES) as f32 / (super::PULSE_FRAMES - 1) as f32;
-    (progress, (std::f32::consts::PI * progress).sin().max(0.0) * 0.55)
-}
-
-fn dock_bars(frame: usize) -> impl Iterator<Item = (f64, f64)> {
-    [(65.25, 9.5, 46.0), (79.75, 13.0, 62.0), (94.25, 10.0, 50.0), (108.75, 18.0, 90.0),
-        (137.75, 18.0, 90.0), (152.25, 10.0, 50.0), (166.75, 13.0, 62.0), (181.25, 9.5, 46.0)]
-        .into_iter().map(move |(x, quiet, loud)| (x, height(quiet, loud, frame) as f64))
+fn opacity(phase: Option<usize>, period: f32) -> f32 {
+    let Some(phase) = phase else { return 1.0; };
+    let seconds = (phase % super::PULSE_FRAMES) as f32 * 0.125;
+    let pulse = (1.0 - (std::f32::consts::TAU * (seconds % period) / period).cos()) / 2.0;
+    0.64 + 0.36 * pulse
 }
 
 #[cfg(target_os = "macos")]
-pub(super) unsafe fn draw_dock(image: *mut objc::runtime::Object, frame: usize, phase: Option<usize>) {
-    use core_graphics::context::{CGContext, CGLineCap};
-    use core_graphics::geometry::{CGPoint, CGRect, CGSize};
+pub(super) unsafe fn draw_dock(image: *mut objc::runtime::Object, _frame: usize, phase: Option<usize>) {
+    draw_dock_window(image, [255, 59, 48], opacity(phase, 1.6));
+}
+
+#[cfg(target_os = "macos")]
+pub(super) unsafe fn draw_meeting_dock(image: *mut objc::runtime::Object, phase: Option<usize>) {
+    draw_dock_window(image, [52, 199, 89], opacity(phase, 3.0));
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn draw_dock_window(image: *mut objc::runtime::Object, color: [u8; 3], opacity: f32) {
+    use core_graphics::context::CGContext;
     use objc::{class, msg_send, sel, sel_impl};
     let _: () = msg_send![image, lockFocus];
     let graphics: *mut objc::runtime::Object = msg_send![class!(NSGraphicsContext), currentContext];
     let raw: *mut core_graphics::sys::CGContext = msg_send![graphics, CGContext];
     if !raw.is_null() {
         let context = CGContext::from_existing_context_ptr(raw);
-        if let Some(phase) = phase {
-            let (progress, opacity) = pulse(phase);
-            let radius = 28.0 + progress as f64 * 16.0;
-            context.set_rgb_stroke_color(1.0, 59.0 / 255.0, 48.0 / 255.0, opacity as f64);
-            context.set_line_width(4.0);
-            context.stroke_ellipse_in_rect(CGRect::new(&CGPoint::new(192.0 - radius, 64.0 - radius), &CGSize::new(radius * 2.0, radius * 2.0)));
-        }
-        context.set_rgb_stroke_color(1.0, 244.0 / 255.0, 230.0 / 255.0, 1.0);
-        context.set_line_width(9.5);
-        context.set_line_cap(CGLineCap::CGLineCapRound);
-        for (x, h) in dock_bars(frame) {
-            context.begin_path();
-            let half = (h - 9.5) / 2.0;
-            // Core Graphics uses a bottom-left origin; the artwork baseline is y=90.
-            context.move_to_point(x + 4.75, 256.0 - 90.0 - half);
-            context.add_line_to_point(x + 4.75, 256.0 - 90.0 + half);
-            context.stroke_path();
-        }
+        // Matches the generated 256px Dock artwork. Core Graphics has a bottom-left origin.
+        let path = |inset: f64| {
+            let (cx, cy, scale) = (128.53125, 256.0 - 97.1875, 4.25);
+            let (w, h, r) = ((5.375 - inset) * scale, (3.25 - inset) * scale, (1.0 - inset) * scale);
+            let (left, right, bottom, top) = (cx - w, cx + w, cy - h, cy + h);
+            context.begin_path(); context.move_to_point(left + r, bottom);
+            context.add_line_to_point(right - r, bottom); context.add_quad_curve_to_point(right, bottom, right, bottom + r);
+            context.add_line_to_point(right, top - r); context.add_quad_curve_to_point(right, top, right - r, top);
+            context.add_line_to_point(left + r, top); context.add_quad_curve_to_point(left, top, left, top - r);
+            context.add_line_to_point(left, bottom + r); context.add_quad_curve_to_point(left, bottom, left + r, bottom); context.close_path();
+        };
+        context.save(); path(0.0); context.clip();
+        context.set_rgb_fill_color(250.0 / 255.0, 249.0 / 255.0, 246.0 / 255.0, 1.0); path(0.12); context.fill_path();
+        context.set_rgb_fill_color(color[0] as f64 / 255.0, color[1] as f64 / 255.0, color[2] as f64 / 255.0, opacity as f64); path(0.45); context.fill_path();
+        context.restore();
     }
     let _: () = msg_send![image, unlockFocus];
 }
@@ -125,102 +98,113 @@ pub(super) unsafe fn draw_dock(image: *mut objc::runtime::Object, frame: usize, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn marker_has_a_white_separator_in_both_menu_bar_appearances() {
-        for dark in [false, true] {
-            let pixels = tray(&[0; 36 * 36 * 4], 0, dark, None);
-            let pixel = |x: usize, y: usize| &pixels[(y * 36 + x) * 4..][..4];
-            assert_eq!(pixel(24, 28), [255, 255, 255, 255]);
-            assert_eq!(pixel(28, 29), [255, 59, 48, 255]);
-            assert!(pixels.chunks_exact(4).any(|p| p[..3] == [23, 25, 27] && p[3] > 0));
-        }
+    fn base(dark: bool) -> &'static [u8] {
+        if dark { include_bytes!("../../icons/letter/idle-dark.rgba") }
+        else { include_bytes!("../../icons/letter/idle.rgba") }
     }
-
-    #[test]
-    fn meeting_marker_matches_recording_size_and_keeps_the_supplied_stem() {
-        for dark in [false, true] {
-            let base: &[u8] = if dark { include_bytes!("../../icons/letter/idle-call-dark.rgba") }
-                else { include_bytes!("../../icons/letter/idle-call.rgba") };
-            let green = meeting_tray(base, dark);
-            let red = tray(base, 0, dark, None);
-            let pixel = |x: usize, y: usize| &green[(y * 36 + x) * 4..][..4];
-            assert_eq!(pixel(28, 29), if dark { [48, 209, 88, 255] } else { [40, 177, 76, 255] });
-            assert_eq!(pixel(24, 28), [255, 255, 255, 255]);
-            assert_eq!(pixel(17, 28), &base[(28 * 36 + 17) * 4..][..4]);
-            for y in 23..36 {
-                for x in 21..36 {
-                    let i = (y * 36 + x) * 4;
-                    assert_eq!(green[i + 3], red[i + 3], "marker silhouettes must match");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn maximum_waveform_and_every_pulse_keep_a_gap_to_the_stem_and_badge() {
-        for (dark, base) in [(false, super::super::LIVE[0]), (true, super::super::LIVE_DARK[0])] {
-            for phase in 0..super::super::PULSE_FRAMES {
-                let pixels = tray(base, 7, dark, Some(phase));
-                // A full transparent pixel row separates the tallest bars from
-                // even the expanding halo; a column separates it from the stem.
-                for x in 21..36 { assert_eq!(pixels[(21 * 36 + x) * 4 + 3], 0); }
-                for y in 24..36 { assert_eq!(pixels[(y * 36 + 21) * 4 + 3], 0); }
+    fn assert_outside_window_unchanged(original: &[u8], pixels: &[u8]) {
+        for y in 0..36 {
+            for x in 0..36 {
+                if (13..24).contains(&x) && (7..14).contains(&y) { continue; }
+                let i = (y * 36 + x) * 4;
+                assert_eq!(&pixels[i..i + 4], &original[i..i + 4], "changed silhouette at {x},{y}");
             }
         }
     }
     #[test]
-    fn waveform_sweep_is_visible_at_menu_bar_and_dock_sizes() {
-        let base = [0; 36 * 36 * 4];
-        let quiet = tray(&base, 0, true, None);
-        let loud = tray(&base, 7, true, None);
-        let changed = quiet.chunks_exact(4).zip(loud.chunks_exact(4)).filter(|(a, b)| a != b).count();
-        assert!(changed > 180, "at least 45 logical pixels should change at 2x");
-        for ((_, low), (_, high)) in dock_bars(0).zip(dock_bars(7)) {
-            assert!(high - low >= 36.0, "every Dock bar must move at least 9pt at 64pt icon size");
-        }
-        assert_eq!(tray(&base, 7, true, None), tray(&base, usize::MAX, true, None));
-    }
-
-    #[test]
-    fn approved_quiet_frames_keep_their_stem_with_readable_overlays() {
-        for (dark, base) in [(false, super::super::LIVE[0]), (true, super::super::LIVE_DARK[0])] {
+    fn every_pulse_preserves_the_selected_silhouette_and_keeps_red_visible() {
+        for dark in [false, true] {
             for frame in 0..8 {
-                let pixels = tray(base, frame, dark, None);
-                assert_eq!(pixels.len(), 36 * 36 * 4);
-                // The lower stem remains the supplied artwork, independent of audio.
-                let stem = (28 * 36 + 17) * 4;
-                assert_eq!(&pixels[stem..stem + 4], &base[stem..stem + 4]);
-                if let Some(directory) = std::env::var_os("TETRO_ICON_PREVIEW_DIR") {
-                    let directory = std::path::PathBuf::from(directory);
-                    std::fs::create_dir_all(&directory).unwrap();
-                    std::fs::write(directory.join(format!("tray-{}-{frame}.rgba", if dark { "dark" } else { "light" })), pixels).unwrap();
-                }
-            }
-            if let Some(directory) = std::env::var_os("TETRO_ICON_PREVIEW_DIR") {
-                let directory = std::path::PathBuf::from(directory);
                 for phase in 0..super::super::PULSE_FRAMES {
-                    std::fs::write(directory.join(format!("pulse-{}-{phase}.rgba", if dark { "dark" } else { "light" })), tray(base, 4, dark, Some(phase))).unwrap();
+                    let pixels = tray(base(dark), frame, dark, Some(phase));
+                    assert_outside_window_unchanged(base(dark), &pixels);
+                    let center = (10 * 36 + 18) * 4;
+                    let signal = &pixels[center..center + 4];
+                    assert_eq!(signal[3], 255);
+                    assert!(signal[0] > 240 && signal[1] < 150 && signal[2] < 140);
                 }
             }
         }
     }
-
     #[test]
-    fn halo_expands_and_fades_without_blinking_the_recording_marker() {
-        let base = super::super::LIVE_DARK[0];
-        let still = tray(base, 0, true, None);
-        let first = tray(base, 0, true, Some(0));
-        let middle = tray(base, 0, true, Some(8));
-        let last = tray(base, 0, true, Some(15));
-        assert_eq!(still, first);
-        assert_eq!(still, last);
-        assert_ne!(still, middle);
-        for phase in 0..super::super::PULSE_FRAMES {
-            let pixels = tray(base, 0, true, Some(phase));
-            let center = (29 * 36 + 28) * 4;
-            assert_eq!(&pixels[center..center + 4], &[255, 59, 48, 255]);
+    fn meeting_window_stays_green_in_both_appearances_through_the_whole_pulse() {
+        for dark in [false, true] {
+            for phase in 0..super::super::PULSE_FRAMES {
+                let pixels = meeting_tray(base(dark), dark, Some(phase));
+                assert_outside_window_unchanged(base(dark), &pixels);
+                let center = (10 * 36 + 18) * 4;
+                let signal = &pixels[center..center + 4];
+                assert_eq!(signal[3], 255);
+                assert!(signal[1] > signal[0] && signal[1] > signal[2]);
+            }
         }
-        assert!(pulse(2).0 < pulse(8).0);
-        assert!(pulse(12).1 < pulse(8).1);
+    }
+    #[test]
+    fn windows_pulse_at_the_approved_rates_and_reduce_motion_holds_them_bright() {
+        let original = base(true);
+        let bright = tray(original, 0, true, None);
+        assert_eq!(bright, tray(original, usize::MAX, true, None));
+        assert_ne!(bright, tray(original, 0, true, Some(0)));
+        assert_eq!(tray(original, 0, true, Some(0)), tray(original, 0, true, Some(64)));
+        assert!(opacity(Some(6), 1.6) > 0.99);
+        assert_eq!(opacity(None, 1.6), 1.0);
+        assert_eq!(opacity(Some(0), 3.0), 0.64);
+        assert_eq!(opacity(Some(12), 3.0), 1.0);
+        assert_eq!(meeting_tray(original, true, Some(12)), meeting_tray(original, true, None));
+        assert_eq!(meeting_tray(original, true, Some(0)), meeting_tray(original, true, Some(24)));
+    }
+    #[test]
+    fn paused_and_processing_assets_keep_the_same_outer_shape() {
+        for pixels in std::iter::once(include_bytes!("../../icons/letter/paused.rgba").as_slice()).chain(super::super::WORKING.iter().copied()) {
+            assert_outside_window_unchanged(base(false), pixels);
+            assert_ne!(base(false), pixels);
+        }
+    }
+    #[test]
+    fn export_native_renderer_previews_when_requested() {
+        if let Some(directory) = std::env::var_os("TETRO_ICON_PREVIEW_DIR") {
+            let directory = std::path::PathBuf::from(directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            for dark in [false, true] {
+                let appearance = if dark { "dark" } else { "light" };
+                std::fs::write(directory.join(format!("meeting-{appearance}.rgba")), meeting_tray(base(dark), dark, None)).unwrap();
+                for frame in 0..8 {
+                    std::fs::write(directory.join(format!("tray-{appearance}-{frame}.rgba")), tray(base(dark), frame, dark, None)).unwrap();
+                }
+                for phase in 0..super::super::PULSE_FRAMES {
+                    std::fs::write(directory.join(format!("pulse-{appearance}-{phase}.rgba")), tray(base(dark), 4, dark, Some(phase))).unwrap();
+                    std::fs::write(directory.join(format!("meeting-{appearance}-{phase}.rgba")), meeting_tray(base(dark), dark, Some(phase))).unwrap();
+                }
+            }
+            #[cfg(target_os = "macos")]
+            export_dock_previews(&directory);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn export_dock_previews(directory: &std::path::Path) {
+        use objc::{class, msg_send, sel, sel_impl};
+        use objc::runtime::Object;
+        // Offscreen NSImages exercise the exact renderer used by the Dock.
+        objc::rc::autoreleasepool(|| unsafe {
+            for (name, meeting, phase) in [("red-bright", false, None), ("red-dim", false, Some(0)), ("red-pulse", false, Some(6)), ("green-bright", true, None), ("green-dim", true, Some(0)), ("green-pulse", true, Some(12))] {
+                let bytes = super::super::DOCK[0];
+                let data: *mut Object = msg_send![class!(NSData), dataWithBytes:bytes.as_ptr() length:bytes.len()];
+                let allocated: *mut Object = msg_send![class!(NSImage), alloc];
+                let image: *mut Object = msg_send![allocated, initWithData:data];
+                assert!(!image.is_null());
+                if meeting { draw_meeting_dock(image, phase); } else { draw_dock(image, 0, phase); }
+                let tiff: *mut Object = msg_send![image, TIFFRepresentation];
+                let bitmap: *mut Object = msg_send![class!(NSBitmapImageRep), imageRepWithData:tiff];
+                let properties: *mut Object = msg_send![class!(NSDictionary), dictionary];
+                let png: *mut Object = msg_send![bitmap, representationUsingType:4usize properties:properties];
+                assert!(!png.is_null());
+                let length: usize = msg_send![png, length];
+                let pointer: *const u8 = msg_send![png, bytes];
+                let bytes = std::slice::from_raw_parts(pointer, length);
+                std::fs::write(directory.join(format!("dock-native-{name}.png")), bytes).unwrap();
+                let _: () = msg_send![image, release];
+            }
+        });
     }
 }
