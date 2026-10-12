@@ -5,7 +5,17 @@ static FFMPEG_PATH: Lazy<Option<PathBuf>>=Lazy::new(|| {
     if let Ok(exe)=std::env::current_exe() {
         if let Some(parent)=exe.parent() {
             let bundled=parent.join(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" });
-            if bundled.symlink_metadata().is_ok_and(|m|m.is_file() && !m.file_type().is_symlink()) { return Some(bundled); }
+            if bundled.symlink_metadata().is_ok_and(|m|m.is_file() && !m.file_type().is_symlink()) {
+                #[cfg(windows)] {
+                    let target=if cfg!(target_arch="aarch64") { "aarch64-pc-windows-msvc" } else { "x86_64-pc-windows-msvc" };
+                    match crate::verified_ffmpeg::verify(&bundled,target) {
+                        Ok(())=>return Some(bundled),
+                        Err(error)=>{log::error!("Bundled Windows audio component verification failed: {error}");return None;}
+                    }
+                }
+                #[cfg(not(windows))]
+                return Some(bundled);
+            }
         }
     }
     let target=if cfg!(all(target_os="macos",target_arch="aarch64")) { "aarch64-apple-darwin" } else if cfg!(all(target_os="macos",target_arch="x86_64")) { "x86_64-apple-darwin" } else { return None };

@@ -1,0 +1,68 @@
+name: Windows Dev builds
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: windows-dev-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    name: Dev ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            msvc: amd64
+          - runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            msvc: amd64_arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26.7.0'
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
+        with:
+          arch: ${{ matrix.msvc }}
+      - name: Prepare pinned Rust and pnpm
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          rustup toolchain install 1.97.1 --profile minimal
+          if ($LASTEXITCODE) { throw 'Rust install failed' }
+          rustup override set 1.97.1
+          rustup target add ${{ matrix.target }}
+          npm install --global pnpm@11.22.0
+          if ($LASTEXITCODE) { throw 'pnpm install failed' }
+          pnpm --dir frontend install --frozen-lockfile
+          if ($LASTEXITCODE) { throw 'Frontend dependency installation failed' }
+          & C:\msys64\usr\bin\pacman.exe -S --needed --noconfirm make diffutils
+          if ($LASTEXITCODE) { throw 'MSYS2 build prerequisites failed' }
+      - name: Shared frontend checks
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        shell: pwsh
+        run: |
+          pnpm --dir frontend typecheck
+          if ($LASTEXITCODE) { throw 'Frontend typecheck failed' }
+          pnpm --dir frontend test
+          if ($LASTEXITCODE) { throw 'Frontend tests failed' }
+      - name: Native Windows Dev build and checks
+        shell: pwsh
+        run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }}
+      - name: Retain internal installer and build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tetro-dev-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            target/windows-dev/${{ github.sha }}/${{ matrix.target }}/
+            target/windows-dev/dependencies/ffmpeg/8.0.3/${{ matrix.target }}/config.log
+          if-no-files-found: warn
+          retention-days: 30

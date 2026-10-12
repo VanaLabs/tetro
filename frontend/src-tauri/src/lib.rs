@@ -1,5 +1,8 @@
 mod model_integrity;
 mod verified_ffmpeg;
+#[cfg(test)]
+#[path = "../build/onnxruntime.rs"]
+mod onnxruntime_build_tests;
 mod recording_paths;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};

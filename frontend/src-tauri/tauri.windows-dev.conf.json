@@ -1,0 +1,14 @@
+{
+  "mainBinaryName": "tetro-dev",
+  "bundle": {
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": false,
+    "windows": {
+      "signCommand": null,
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "scripts/windows/dev-installer-hooks.nsh"
+      }
+    }
+  }
+}

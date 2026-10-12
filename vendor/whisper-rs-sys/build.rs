@@ -232,6 +232,16 @@ fn main() {
         config.cxxflag("-DWHISPER_DEBUG");
     }
 
+    // Distributed Windows binaries must not inherit the build runner's CPU.
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        config.define("GGML_NATIVE", "OFF");
+        if env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("x86_64") {
+            for flag in ["GGML_AVX", "GGML_AVX2", "GGML_FMA", "GGML_F16C"] {
+                config.define(flag, "OFF");
+            }
+        }
+    }
+
     // Allow passing any WHISPER or CMAKE compile flags
     for (key, value) in env::vars() {
         let is_whisper_flag =
