@@ -18,12 +18,15 @@ fn verify_expected(path:&Path,key:&str,sha:&str,size:u64)->anyhow::Result<()> {
     let mut file=std::fs::File::open(path)?; let before=file.metadata()?;
     anyhow::ensure!(before.len()==size,"Model size does not match its catalog fingerprint");
     let stamp=identity(&before);let cache_key=(path.to_path_buf(),key.to_string());
-    if VERIFIED.lock().unwrap().get(&cache_key)==Some(&stamp) {return Ok(())}
+    // Windows last-write timestamps can stay unchanged across immediate,
+    // same-size rewrites. Rehash there before every native model load; the
+    // Unix cache also includes inode and change-time metadata.
+    if cfg!(unix) && VERIFIED.lock().unwrap().get(&cache_key)==Some(&stamp) {return Ok(())}
     let mut h=Sha256::new();let mut buf=[0;1024*1024];
     loop {let n=file.read(&mut buf)?;if n==0 {break}h.update(&buf[..n]);}
     anyhow::ensure!(identity(&file.metadata()?)==stamp,"Model changed during verification");
     anyhow::ensure!(format!("{:x}",h.finalize())==sha,"Model fingerprint mismatch; remove it and download again");
-    VERIFIED.lock().unwrap().insert(cache_key,stamp);Ok(())
+    if cfg!(unix) { VERIFIED.lock().unwrap().insert(cache_key,stamp); } Ok(())
 }
 pub fn whisper(path:&Path)->anyhow::Result<()> {
     let name=path.file_name().and_then(|v|v.to_str()).ok_or_else(||anyhow::anyhow!("Invalid model path"))?;
@@ -40,6 +43,10 @@ pub fn summary(path:&Path)->anyhow::Result<()> {
     #[test] fn detects_same_size_changes_even_after_a_successful_check() {
         let d=tempfile::tempdir().unwrap();let p=d.path().join("model");std::fs::write(&p,b"good").unwrap();
         let sha=format!("{:x}",Sha256::digest(b"good"));verify_expected(&p,"test",&sha,4).unwrap();
-        std::fs::write(&p,b"evil").unwrap();assert!(verify_expected(&p,"test",&sha,4).is_err());
+        let modified=std::fs::metadata(&p).unwrap().modified().unwrap();
+        std::fs::write(&p,b"evil").unwrap();
+        std::fs::File::open(&p).unwrap().set_modified(modified).unwrap();
+        assert_eq!(std::fs::metadata(&p).unwrap().modified().unwrap(),modified);
+        assert!(verify_expected(&p,"test",&sha,4).is_err());
     }
 }

@@ -1,5 +1,22 @@
 {
   "mainBinaryName": "tetro-dev",
+  "app": {
+    "windows": [
+      {
+        "title": "Tetro Dev — Local testing",
+        "width": 1100,
+        "height": 700,
+        "center": true,
+        "resizable": true,
+        "fullscreen": false,
+        "theme": "Light",
+        "decorations": true,
+        "devtools": true,
+        "minWidth": 740,
+        "minHeight": 500
+      }
+    ]
+  },
   "bundle": {
     "targets": ["nsis"],
     "createUpdaterArtifacts": false,
