@@ -239,6 +239,17 @@ fn main() {
             for flag in ["GGML_AVX", "GGML_AVX2", "GGML_FMA", "GGML_F16C"] {
                 config.define(flag, "OFF");
             }
+        } else if env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("aarch64") {
+            // The bundled GGML probes optional ARM instructions with /arch:armv8.2,
+            // then defines feature macros without applying that flag to the build.
+            // Keep Windows ARM64 on baseline NEON and its FP32 fallback instead.
+            for probe in [
+                "GGML_COMPILER_SUPPORT_DOTPROD",
+                "GGML_COMPILER_SUPPORT_MATMUL_INT8",
+                "GGML_COMPILER_SUPPORT_FP16_VECTOR_ARITHMETIC",
+            ] {
+                config.define(probe, "FALSE");
+            }
         }
     }
 
