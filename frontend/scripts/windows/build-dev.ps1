@@ -19,6 +19,19 @@ $source = (& git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Build provenance requires the source Git commit' }
 $recordDir = Join-Path $root "target\windows-dev\$source\$Target"
 New-Item -ItemType Directory -Path $recordDir -Force | Out-Null
+$tinySpec = ([IO.File]::ReadAllText((Join-Path $root 'frontend\src-tauri\model-fingerprints.json')) | ConvertFrom-Json).'stt-whisper/ggml-tiny.bin'
+$tiny = Join-Path $root 'frontend\src-tauri\resources\models\ggml-tiny.bin'
+if ($Stage -in @('all','ffmpeg')) {
+  if ($tinySpec.source -notmatch '^https://huggingface\.co/Vana-Labs/stt-whisper/resolve/[0-9a-f]{40}/ggml-tiny\.bin$') { throw 'Bundled Tiny must use the pinned Vana Labs source' }
+  New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($tiny)) -Force | Out-Null
+  if ((Test-Path $tiny) -and ((Get-Item $tiny).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Bundled Tiny cannot be a reparse point' }
+  if (!(Test-Path $tiny) -or (Get-Item $tiny).Length -ne $tinySpec.size -or (Get-FileHash $tiny -Algorithm SHA256).Hash -ne $tinySpec.sha256) {
+    $partial = "$tiny.part"
+    Invoke-WebRequest -Uri $tinySpec.source -OutFile $partial
+    if ((Get-Item $partial).Length -ne $tinySpec.size -or (Get-FileHash $partial -Algorithm SHA256).Hash -ne $tinySpec.sha256) { throw 'Bundled Tiny failed catalog fingerprint verification' }
+    Move-Item $partial $tiny -Force
+  }
+}
 $env:CARGO_TARGET_DIR = Join-Path $root 'target\windows-dev\cargo'
 $env:CMAKE_GENERATOR = 'Ninja'
 $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
@@ -119,16 +132,21 @@ console.log('App, sidecars and ONNX DLLs all match $Target.');
   $installers = @(Get-ChildItem (Join-Path $releaseDir 'bundle\nsis') -Filter '*.exe')
   if ($installers.Count -ne 1) { throw 'Expected exactly one Windows Dev NSIS installer' }
   Copy-Item $installers[0].FullName $recordDir
-  $payloads = @((Join-Path $releaseDir 'tetro-dev.exe'),$ffmpeg,(Join-Path $releaseDir 'llama-helper.exe'),(Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\onnxruntime.dll'),(Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\onnxruntime_providers_shared.dll'))
+  $mainRecordFile = Join-Path $recordDir 'main-executable.json'
+  Invoke-Checked 'node' @('frontend/scripts/windows/nsis-main-record.mjs',(Join-Path $releaseDir 'tetro-dev.exe'),$Target,$mainRecordFile)
+  $mainRecord = [IO.File]::ReadAllText($mainRecordFile) | ConvertFrom-Json
+  $payloads = @($ffmpeg,(Join-Path $releaseDir 'llama-helper.exe'),(Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\onnxruntime.dll'),(Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\onnxruntime_providers_shared.dll'))
   $record = [ordered]@{
     SourceCommit=$source; Target=$Target; Identity='am.vanalabs.tetro.dev'; Product='Tetro Dev'
     WindowsMinimumBuild=22000; Updater='disabled'; Authenticode='unsigned internal Dev build'
     FfmpegSourceSHA256='6136812ea6d4e68bdba27e33c2a94382711cdf4f8602ffef056ff792bd6f9818'
     FfmpegEmbeddedPin=[ordered]@{Target=$env:TETRO_WINDOWS_FFMPEG_TARGET;SHA256=$env:TETRO_WINDOWS_FFMPEG_SHA256;Size=$env:TETRO_WINDOWS_FFMPEG_SIZE}
     MicrosoftRuntime=$runtimeRecords
+    CompilerExecutableSHA256=$mainRecord.CompilerSHA256
+    BundledModels=@([ordered]@{Name='ggml-tiny.bin';ResourcePath='resources/models/ggml-tiny.bin';Size=$tinySpec.size;SHA256=$tinySpec.sha256})
     BuildHost=[Environment]::OSVersion.VersionString; Rust=((& rustc --version) -join ''); Node=((& node --version) -join '')
     GitHubRun=$env:GITHUB_RUN_ID; GitHubAttempt=$env:GITHUB_RUN_ATTEMPT
-    Payloads=@($payloads | ForEach-Object {[ordered]@{Name=[IO.Path]::GetFileName($_);Size=(Get-Item $_).Length;SHA256=(Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()}})
+    Payloads=@([ordered]@{Name=$mainRecord.Name;Size=$mainRecord.Size;SHA256=$mainRecord.SHA256}) + @($payloads | ForEach-Object {[ordered]@{Name=[IO.Path]::GetFileName($_);Size=(Get-Item $_).Length;SHA256=(Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()}})
     Installer=[ordered]@{Name=$installers[0].Name;Size=$installers[0].Length;SHA256=(Get-FileHash $installers[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
     PackagedUtc=(Get-Date).ToUniversalTime().ToString('o'); PhysicalDeviceTests='not run in CI'
   }
@@ -137,6 +155,13 @@ console.log('App, sidecars and ONNX DLLs all match $Target.');
 }
 if (!$SkipTests -and $Stage -in @('all','tests')) {
   Write-Host '::notice title=Windows Dev stage::Installer and payload machine types verified; running native Rust regression tests'
-  Invoke-Checked 'cargo' @('test','--workspace','--locked','--release','--target',$Target,'--features','dev-profile','--','--skip','wake_fails_gracefully_for_unknown_device','--skip','test_list_system_audio_devices')
+  # Standalone test executables need the same verified native files as the app.
+  $testDir = Join-Path $releaseDir 'deps'
+  New-Item -ItemType Directory -Path $testDir -Force | Out-Null
+  Copy-Item $ffmpeg (Join-Path $testDir 'ffmpeg.exe')
+  Copy-Item (Join-Path $runtimeDir '*.dll') $testDir
+  Copy-Item (Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\*.dll') $testDir
+  $env:ORT_DYLIB_PATH = Join-Path $testDir 'onnxruntime.dll'
+  Invoke-Checked 'cargo' @('test','--workspace','--locked','--release','--target',$Target,'--features','dev-profile','--','--test-threads=1','--nocapture','--skip','wake_fails_gracefully_for_unknown_device','--skip','test_list_system_audio_devices')
 }
 Write-Host "Windows Dev artifacts and provenance: $recordDir"

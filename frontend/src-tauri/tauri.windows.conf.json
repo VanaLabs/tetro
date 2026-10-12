@@ -2,6 +2,7 @@
   "bundle": {
     "resources": {
       "templates": "templates",
+      "resources/models/ggml-tiny.bin": "resources/models/ggml-tiny.bin",
       "binaries/onnxruntime": ".",
       "binaries/ffmpeg-LICENSE.txt": "licenses/ffmpeg-LICENSE.txt",
       "binaries/msvc-runtime": "."
