@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Called from Windows Dev tooling, with an initialized MSVC environment.
 set -euo pipefail
-export PATH="$PATH:/usr/bin:/bin"
+export PATH="/usr/bin:/bin:$PATH"
 target=${1:?Windows Rust target required}
 root=$(cd "$(dirname "$0")/../../.." && pwd)
 case "$target" in
@@ -20,12 +20,20 @@ if [[ ! -f "$archive" ]]; then
 fi
 printf '%s  %s\n' "$digest" "$archive" | sha256sum -c -
 source_root=$(mktemp -d "$work/verified.XXXXXX")
-trap 'rm -rf "$source_root"' EXIT
+cleanup() {
+  if [[ -n "${build:-}" ]]; then
+    for file in config.h ffbuild/config.mak ffbuild/config.log; do
+      [[ ! -f "$build/$file" ]] || cp "$build/$file" "$work/$(basename "$file")"
+    done
+  fi
+  rm -rf "$source_root"
+}
+trap cleanup EXIT
 tar -xJf "$archive" -C "$source_root"
 build=$(mktemp -d "$work/build.XXXXXX")
 cl_path=$(command -v cl.exe)
 # Avoid MSYS's unrelated link.exe shadowing the Microsoft linker.
-export PATH="$(dirname "$cl_path"):$PATH:/usr/bin:/bin"
+export PATH="$(dirname "$cl_path"):/usr/bin:/bin:$PATH"
 cd "$build"
 "$source_root/ffmpeg-$version/configure" --toolchain=msvc --arch="$arch" --target-os=win32 \
   --disable-autodetect --disable-network --disable-doc --disable-debug --disable-shared --enable-static \

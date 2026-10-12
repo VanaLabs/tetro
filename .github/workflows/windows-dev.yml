@@ -1,10 +1,16 @@
 name: Windows Dev builds
 on:
   workflow_dispatch:
+    inputs:
+      architecture:
+        description: Architectures to build
+        type: choice
+        options: [both, x64, arm64]
+        default: both
 permissions:
   contents: read
 concurrency:
-  group: windows-dev-${{ github.ref }}
+  group: windows-dev-${{ github.ref }}-${{ inputs.architecture || 'both' }}
   cancel-in-progress: false
 jobs:
   build:
@@ -12,13 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: windows-2022
-            target: x86_64-pc-windows-msvc
-            msvc: amd64
-          - runner: windows-11-arm
-            target: aarch64-pc-windows-msvc
-            msvc: amd64_arm64
+        include: ${{ fromJSON(inputs.architecture == 'x64' && '[{"runner":"windows-2022","target":"x86_64-pc-windows-msvc","msvc":"amd64"}]' || inputs.architecture == 'arm64' && '[{"runner":"windows-11-arm","target":"aarch64-pc-windows-msvc","msvc":"amd64_arm64"}]' || '[{"runner":"windows-2022","target":"x86_64-pc-windows-msvc","msvc":"amd64"},{"runner":"windows-11-arm","target":"aarch64-pc-windows-msvc","msvc":"amd64_arm64"}]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     steps:
