@@ -38,8 +38,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/windows-dev/cargo
-          key: windows-dev-${{ matrix.target }}-rust1971-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
-          restore-keys: windows-dev-${{ matrix.target }}-rust1971-${{ hashFiles('Cargo.lock') }}-
+          key: windows-dev-v2-${{ matrix.target }}-rust1971-${{ env.VCToolsVersion }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('frontend/scripts/windows/build-dev.ps1', 'vendor/whisper-rs-sys/build.rs') }}-${{ github.sha }}
+          restore-keys: windows-dev-v2-${{ matrix.target }}-rust1971-${{ env.VCToolsVersion }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('frontend/scripts/windows/build-dev.ps1', 'vendor/whisper-rs-sys/build.rs') }}-
       - name: Prepare pinned Rust and pnpm
         shell: pwsh
         run: |
@@ -92,4 +92,4 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/windows-dev/cargo
-          key: windows-dev-${{ matrix.target }}-rust1971-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          key: windows-dev-v2-${{ matrix.target }}-rust1971-${{ env.VCToolsVersion }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('frontend/scripts/windows/build-dev.ps1', 'vendor/whisper-rs-sys/build.rs') }}-${{ github.sha }}

@@ -85,6 +85,14 @@ if ($Stage -in @('all','ffmpeg')) {
 $releaseDir = Join-Path $env:CARGO_TARGET_DIR "$Target\release"
 if ($Stage -in @('all','helper')) {
   Write-Host '::notice title=Windows Dev stage::Building the summary sidecar'
+  $nativeBuildRoot = Join-Path $releaseDir 'build'
+  foreach ($entry in Get-ChildItem $nativeBuildRoot -Directory -Filter 'llama-cpp-sys-2-*' -ErrorAction SilentlyContinue) {
+    $cmakeBuild = Join-Path $entry.FullName 'out\build'
+    if ((Test-Path (Join-Path $cmakeBuild 'CMakeCache.txt')) -and !(Test-Path (Join-Path $cmakeBuild 'build.ninja'))) {
+      # A failed configure leaves a cache that this dependency would otherwise reuse.
+      Remove-Item $cmakeBuild -Recurse -Force
+    }
+  }
   Invoke-Checked 'cargo' @('build','--locked','--release','--target',$Target,'-p','llama-helper')
   Copy-Item (Join-Path $releaseDir 'llama-helper.exe') (Join-Path $root "frontend\src-tauri\binaries\llama-helper-$Target.exe")
   $imports = & dumpbin.exe /DEPENDENTS (Join-Path $releaseDir 'llama-helper.exe')
