@@ -35,7 +35,7 @@ cl_path=$(command -v cl.exe)
 # Avoid MSYS's unrelated link.exe shadowing the Microsoft linker.
 export PATH="$(dirname "$cl_path"):/usr/bin:/bin:$PATH"
 cd "$build"
-"$source_root/ffmpeg-$version/configure" --toolchain=msvc --arch="$arch" --target-os=win32 \
+"$source_root/ffmpeg-$version/configure" --toolchain=msvc --cc="${TETRO_FFMPEG_CC:-cl}" --arch="$arch" --target-os=win32 \
   --disable-autodetect --disable-network --disable-doc --disable-debug --disable-shared --enable-static \
   --disable-programs --enable-ffmpeg --disable-everything --disable-asm \
   --enable-protocol=file,pipe --enable-demuxer=mov,matroska,asf,wav,mp3,flac,ogg,aac,concat,pcm_f32le \

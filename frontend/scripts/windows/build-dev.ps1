@@ -43,6 +43,24 @@ foreach ($required in @('msvcp140.dll','msvcp140_1.dll','vcruntime140.dll')) {
 $bash = 'C:\msys64\usr\bin\bash.exe'
 if (!(Test-Path $bash)) { throw 'MSYS2 GNU make/bash are required for the pinned FFmpeg source build' }
 if (!(Get-Command cl.exe -ErrorAction SilentlyContinue)) { throw 'Initialize the matching MSVC developer environment first' }
+# LLVM accepts upstream's empty C initializers, which newer ARM MSVC rejects.
+# Prefer the native-host LLVM installation so bindgen can load its libclang too.
+$llvmCandidates = @((Join-Path $env:VCINSTALLDIR 'Tools\Llvm\ARM64\bin'),(Join-Path $env:VCINSTALLDIR 'Tools\Llvm\x64\bin'),'C:\Program Files\LLVM\bin')
+$rustHost = ((& rustc -vV) | Where-Object {$_ -like 'host:*'}) -replace '^host:\s*',''
+$hostMachine = if ($rustHost -like 'aarch64-*') { 0xaa64 } else { 0x8664 }
+$llvm = $null
+foreach ($directory in $llvmCandidates) {
+  $dll = Join-Path $directory 'libclang.dll'
+  if ((Test-Path $dll) -and (Test-Path (Join-Path $directory 'clang-cl.exe'))) {
+    $bytes=[IO.File]::ReadAllBytes($dll);$pe=[BitConverter]::ToInt32($bytes,60)
+    if ([BitConverter]::ToUInt16($bytes,$pe+4) -eq $hostMachine) {$llvm=$directory;break}
+  }
+}
+if (!$llvm) { throw "A native libclang/clang-cl installation is required for Rust host $rustHost" }
+$env:LIBCLANG_PATH = $llvm
+$env:Path = "$llvm;$env:Path"
+$env:TETRO_FFMPEG_CC = "clang-cl --target=$Target"
+Write-Host '::notice title=Windows Dev stage::Building pinned FFmpeg with the matching LLVM/MSVC toolchain'
 Invoke-Checked $bash @('--noprofile','--norc','frontend/scripts/ffmpeg/build-windows.sh',$Target)
 $ffmpeg = Join-Path $root "frontend\src-tauri\binaries\ffmpeg-$Target.exe"
 $env:TETRO_WINDOWS_FFMPEG_TARGET = $Target
@@ -51,9 +69,11 @@ $env:TETRO_WINDOWS_FFMPEG_SIZE = (Get-Item $ffmpeg).Length.ToString([Globalizati
 $ffmpegWork = Join-Path $root "target\windows-dev\dependencies\ffmpeg\8.0.3\$Target"
 Copy-Item (Join-Path $ffmpegWork 'COPYING.LGPLv2.1') (Join-Path $root 'frontend\src-tauri\binaries\ffmpeg-LICENSE.txt')
 Invoke-Checked 'node' @('frontend/scripts/windows/smoke-ffmpeg.mjs',$ffmpeg,$Target,(Join-Path $recordDir 'ffmpeg-smoke'))
+Write-Host '::notice title=Windows Dev stage::Native FFmpeg encode/decode passed; building the summary sidecar'
 Invoke-Checked 'cargo' @('build','--locked','--release','--target',$Target,'-p','llama-helper')
 $releaseDir = Join-Path $env:CARGO_TARGET_DIR "$Target\release"
 Copy-Item (Join-Path $releaseDir 'llama-helper.exe') (Join-Path $root "frontend\src-tauri\binaries\llama-helper-$Target.exe")
+Write-Host '::notice title=Windows Dev stage::Summary sidecar built; compiling and packaging Tetro Dev'
 Invoke-Checked 'pnpm.cmd' @('--dir','frontend','exec','tauri','build','--config','src-tauri/tauri.dev.conf.json','--config','src-tauri/tauri.windows-dev.conf.json','--features','dev-profile','--target',$Target,'--bundles','nsis','--ci','--','--locked')
 $inspect = @"
 import { assertWindowsMachine } from './frontend/scripts/windows/pe.mjs';
@@ -88,6 +108,7 @@ $record = [ordered]@{
 [IO.File]::WriteAllText((Join-Path $recordDir 'build-record.json'), ($record | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
 Copy-Item (Join-Path $ffmpegWork 'config.h'),(Join-Path $ffmpegWork 'config.mak'),(Join-Path $ffmpegWork 'COPYING.LGPLv2.1') $recordDir
 if (!$SkipTests) {
+  Write-Host '::notice title=Windows Dev stage::Installer and payload machine types verified; running native Rust regression tests'
   Invoke-Checked 'cargo' @('test','--workspace','--locked','--release','--target',$Target,'--features','dev-profile','--','--skip','wake_fails_gracefully_for_unknown_device','--skip','test_list_system_audio_devices')
 }
 Write-Host "Windows Dev artifacts and provenance: $recordDir"
