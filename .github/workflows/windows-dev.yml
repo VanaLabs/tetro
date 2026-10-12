@@ -31,6 +31,15 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
           arch: ${{ matrix.msvc }}
+      - name: Restore native compilation cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/windows-dev/cargo
+          key: windows-dev-${{ matrix.target }}-rust1971-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}
+          restore-keys: windows-dev-${{ matrix.target }}-rust1971-${{ hashFiles('Cargo.lock') }}-
       - name: Prepare pinned Rust and pnpm
         shell: pwsh
         run: |
@@ -66,3 +75,12 @@ jobs:
             target/windows-dev/dependencies/ffmpeg/8.0.3/${{ matrix.target }}/config.log
           if-no-files-found: warn
           retention-days: 30
+      - name: Save native compilation cache
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/windows-dev/cargo
+          key: windows-dev-${{ matrix.target }}-rust1971-${{ hashFiles('Cargo.lock') }}-${{ github.sha }}

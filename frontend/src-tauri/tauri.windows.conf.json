@@ -3,7 +3,8 @@
     "resources": {
       "templates": "templates",
       "binaries/onnxruntime": ".",
-      "binaries/ffmpeg-LICENSE.txt": "licenses/ffmpeg-LICENSE.txt"
+      "binaries/ffmpeg-LICENSE.txt": "licenses/ffmpeg-LICENSE.txt",
+      "binaries/msvc-runtime": "."
     }
   }
 }

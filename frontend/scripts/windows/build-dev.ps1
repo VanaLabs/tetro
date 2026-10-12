@@ -22,6 +22,24 @@ $env:CMAKE_POLICY_VERSION_MINIMUM = '3.5'
 # Windows ONNX is loaded from the separately pinned Microsoft DLLs; do not stage
 # a second runtime via ort-sys's build-time downloader.
 $env:ORT_SKIP_DOWNLOAD = '1'
+$redistArch = if ($Target -eq 'aarch64-pc-windows-msvc') { 'arm64' } else { 'x64' }
+$redistRoot = Join-Path $env:VCToolsRedistDir $redistArch
+$crt = @(Get-ChildItem $redistRoot -Directory -Filter 'Microsoft.VC*.CRT' | Sort-Object Name -Descending)[0]
+if (!$crt) { throw 'Matching Microsoft redistributable CRT directory is missing' }
+$runtimeDir = Join-Path $root 'frontend\src-tauri\binaries\msvc-runtime'
+New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+$runtimeRecords = @()
+foreach ($dll in Get-ChildItem $crt.FullName -Filter '*.dll') {
+  $signature = Get-AuthenticodeSignature $dll.FullName
+  if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
+    throw "Microsoft CRT signature verification failed: $($dll.Name)"
+  }
+  Copy-Item $dll.FullName $runtimeDir
+  $runtimeRecords += [ordered]@{Name=$dll.Name;SHA256=(Get-FileHash $dll.FullName -Algorithm SHA256).Hash.ToLowerInvariant();Publisher=$signature.SignerCertificate.Subject;Authenticode=$signature.Status.ToString()}
+}
+foreach ($required in @('msvcp140.dll','msvcp140_1.dll','vcruntime140.dll')) {
+  if (!(Test-Path (Join-Path $runtimeDir $required))) { throw "Missing required Microsoft CRT: $required" }
+}
 $bash = 'C:\msys64\usr\bin\bash.exe'
 if (!(Test-Path $bash)) { throw 'MSYS2 GNU make/bash are required for the pinned FFmpeg source build' }
 if (!(Get-Command cl.exe -ErrorAction SilentlyContinue)) { throw 'Initialize the matching MSVC developer environment first' }
@@ -39,10 +57,11 @@ Copy-Item (Join-Path $releaseDir 'llama-helper.exe') (Join-Path $root "frontend\
 Invoke-Checked 'pnpm.cmd' @('--dir','frontend','exec','tauri','build','--config','src-tauri/tauri.dev.conf.json','--config','src-tauri/tauri.windows-dev.conf.json','--features','dev-profile','--target',$Target,'--bundles','nsis','--ci','--','--locked')
 $inspect = @"
 import { assertWindowsMachine } from './frontend/scripts/windows/pe.mjs';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 const app = '$($releaseDir.Replace('\','/'))/tetro-dev.exe';
 if (!existsSync(app)) throw new Error('Missing isolated Dev executable');
 for (const path of [app, '$($ffmpeg.Replace('\','/'))', '$($releaseDir.Replace('\','/'))/llama-helper.exe', 'frontend/src-tauri/binaries/onnxruntime/onnxruntime.dll', 'frontend/src-tauri/binaries/onnxruntime/onnxruntime_providers_shared.dll']) assertWindowsMachine(path, '$Target');
+for (const name of readdirSync('frontend/src-tauri/binaries/msvc-runtime')) assertWindowsMachine('frontend/src-tauri/binaries/msvc-runtime/' + name, '$Target');
 console.log('App, sidecars and ONNX DLLs all match $Target.');
 "@
 $inspectFile = Join-Path $root 'target\windows-dev\inspect-payload.mjs'
@@ -59,6 +78,7 @@ $record = [ordered]@{
   WindowsMinimumBuild=22000; Updater='disabled'; Authenticode='unsigned internal Dev build'
   FfmpegSourceSHA256='6136812ea6d4e68bdba27e33c2a94382711cdf4f8602ffef056ff792bd6f9818'
   FfmpegEmbeddedPin=[ordered]@{Target=$env:TETRO_WINDOWS_FFMPEG_TARGET;SHA256=$env:TETRO_WINDOWS_FFMPEG_SHA256;Size=$env:TETRO_WINDOWS_FFMPEG_SIZE}
+  MicrosoftRuntime=$runtimeRecords
   BuildHost=[Environment]::OSVersion.VersionString; Rust=((& rustc --version) -join ''); Node=((& node --version) -join '')
   GitHubRun=$env:GITHUB_RUN_ID; GitHubAttempt=$env:GITHUB_RUN_ATTEMPT
   Payloads=@($payloads | ForEach-Object {[ordered]@{Name=[IO.Path]::GetFileName($_);Size=(Get-Item $_).Length;SHA256=(Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()}})

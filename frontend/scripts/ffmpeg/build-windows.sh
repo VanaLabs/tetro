@@ -34,7 +34,8 @@ cd "$build"
   --enable-muxer=mp4,wav --enable-parser=aac,mpegaudio,flac,opus,vorbis \
   --enable-decoder=aac,aac_fixed,mp3,mp3float,flac,vorbis,opus,wmav1,wmav2,wmapro,wmalossless,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,alac \
   --enable-encoder=aac,pcm_s16le --enable-filter=aresample,anull,aformat,asetpts,amix,volume
-make -r -j4
+# The runner also has a native Windows make, which cannot resolve /c/... paths.
+/usr/bin/make -r -j4
 cp ffmpeg.exe "$work/ffmpeg-$target.exe"
 cp config.h "$work/config.h"
 cp ffbuild/config.mak "$work/config.mak"
