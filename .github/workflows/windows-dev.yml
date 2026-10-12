@@ -62,9 +62,18 @@ jobs:
           if ($LASTEXITCODE) { throw 'Frontend typecheck failed' }
           pnpm --dir frontend test
           if ($LASTEXITCODE) { throw 'Frontend tests failed' }
-      - name: Native Windows Dev build and checks
+      - name: Build and test native audio tools
         shell: pwsh
-        run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }}
+        run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage ffmpeg
+      - name: Build native summary engine
+        shell: pwsh
+        run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage helper
+      - name: Build and package Tetro Dev
+        shell: pwsh
+        run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage app
+      - name: Native Rust regression checks
+        shell: pwsh
+        run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage tests
       - name: Retain internal installer and build evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
