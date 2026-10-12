@@ -6,7 +6,7 @@ matching Windows runner and retains internal installers and build records.
 It does not publish releases or update the consumer manifest.
 
 The build host needs Rust, Node/pnpm from the workflow, MSVC for the target,
-native-host LLVM with `clang-cl` and `libclang`, Ninja, and MSYS2 GNU make.
+LLVM matching the Rust build host with `clang-cl` and `libclang`, Ninja, and MSYS2 GNU make.
 Initialize the matching MSVC environment, then run:
 
 ```powershell
@@ -18,6 +18,10 @@ The script builds FFmpeg from the authenticated, SHA256-pinned 8.0.3 source
 using the restricted Tetro audio recipe. The resulting target, size, and hash
 are embedded in this Dev app and verified before bundling and execution.
 ARM64 also uses Clang for the summary engine, with the Windows MSVC ABI and SDK.
+CI uses x64 Rust/compiler tools on the ARM runner to avoid incomplete records
+from ARM-host libclang. ARM64 binaries and ABI layout tests execute natively.
+The header-only ABI check uses a separate Cargo directory; model CPU decoding
+runs after packaging and the native app regression suite.
 Existing consumer/macOS pins are retained. An internal build does not enable
 consumer Windows distribution or a public dependency download.
 

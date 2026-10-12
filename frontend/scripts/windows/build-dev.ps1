@@ -1,7 +1,7 @@
 param(
   [ValidateSet('x86_64-pc-windows-msvc','aarch64-pc-windows-msvc')]
   [string]$Target = 'x86_64-pc-windows-msvc',
-  [ValidateSet('all','ffmpeg','helper','app','tests')]
+  [ValidateSet('all','bindings','ffmpeg','helper','app','tests')]
   [string]$Stage = 'all',
   [switch]$SkipTests
 )
@@ -75,12 +75,34 @@ foreach ($directory in $llvmCandidates) {
 if (!$llvm) { throw "A native libclang/clang-cl installation is required for Rust host $rustHost" }
 $env:LIBCLANG_PATH = $llvm
 $env:Path = "$llvm;$env:Path"
+Write-Host "Rust build host: $rustHost; native payload target: $Target"
+Invoke-Checked (Join-Path $llvm 'clang-cl.exe') @('--version')
 $env:TETRO_FFMPEG_CC = "clang-cl --target=$Target"
 if ($Target -eq 'aarch64-pc-windows-msvc') {
   # llama.cpp's ARM backend requires Clang; retain the Windows MSVC ABI and SDK.
   $env:CC_aarch64_pc_windows_msvc = Join-Path $llvm 'clang-cl.exe'
   $env:CXX_aarch64_pc_windows_msvc = Join-Path $llvm 'clang-cl.exe'
-  $env:CXXFLAGS_aarch64_pc_windows_msvc = '/EHsc'
+  $env:CFLAGS_aarch64_pc_windows_msvc = '--target=aarch64-pc-windows-msvc'
+  $env:CXXFLAGS_aarch64_pc_windows_msvc = '/EHsc --target=aarch64-pc-windows-msvc'
+}
+if ($Stage -eq 'bindings') {
+  # Keep the header-only build separate so it cannot supply incomplete native
+  # libraries to the app's Cargo cache. Test executables use the actual target.
+  $appCargoDir = $env:CARGO_TARGET_DIR
+  $env:CARGO_TARGET_DIR = Join-Path $root 'target\windows-dev\binding-checks'
+  $env:DOCS_RS = '1'
+  try {
+    Invoke-Checked 'cargo' @('test','-p','whisper-rs-sys','--locked','--release','--target',$Target,'--','--test-threads=1','--nocapture')
+    $bindings = @(Get-ChildItem (Join-Path $env:CARGO_TARGET_DIR "$Target\release\build\whisper-rs-sys-*\out\bindings.rs"))
+    if ($bindings.Count -ne 1) { throw 'Expected one native binding output' }
+    Copy-Item $bindings[0].FullName (Join-Path $recordDir 'whisper-bindings.rs')
+    $check = [ordered]@{SourceCommit=$source;Target=$Target;RustBuildHost=$rustHost;NativeLayoutTests='passed';LibclangSHA256=(Get-FileHash (Join-Path $llvm 'libclang.dll') -Algorithm SHA256).Hash.ToLowerInvariant()}
+    [IO.File]::WriteAllText((Join-Path $recordDir 'whisper-abi-check.json'),($check | ConvertTo-Json),(New-Object Text.UTF8Encoding($false)))
+  } finally {
+    Remove-Item Env:DOCS_RS
+    $env:CARGO_TARGET_DIR = $appCargoDir
+  }
+  return
 }
 if ($Stage -in @('all','ffmpeg')) {
   Write-Host '::notice title=Windows Dev stage::Building pinned FFmpeg with the matching LLVM/MSVC toolchain'

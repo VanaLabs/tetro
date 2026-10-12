@@ -101,6 +101,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed=wrapper.h");
     println!("cargo:rerun-if-changed=whisper.cpp");
+    println!("cargo:rerun-if-env-changed=DOCS_RS");
 
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let whisper_root = out.join("whisper.cpp/");

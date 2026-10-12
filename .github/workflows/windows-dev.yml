@@ -7,10 +7,14 @@ on:
         type: choice
         options: [both, x64, arm64]
         default: both
+      binding_check_only:
+        description: Run only the native Whisper ABI check
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: windows-dev-${{ github.ref }}-${{ inputs.architecture || 'both' }}
+  group: windows-dev-${{ github.ref }}-${{ inputs.architecture || 'both' }}-${{ inputs.binding_check_only || false }}
   cancel-in-progress: false
 jobs:
   build:
@@ -44,9 +48,11 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          rustup toolchain install 1.97.1 --profile minimal
+          # Build tools use the mature x64 libclang on either runner. ARM64
+          # target executables still run natively on the Windows ARM runner.
+          rustup toolchain install 1.97.1-x86_64-pc-windows-msvc --profile minimal --force-non-host
           if ($LASTEXITCODE) { throw 'Rust install failed' }
-          rustup override set 1.97.1
+          rustup override set 1.97.1-x86_64-pc-windows-msvc
           rustup target add ${{ matrix.target }}
           npm install --global pnpm@11.22.0
           if ($LASTEXITCODE) { throw 'pnpm install failed' }
@@ -55,20 +61,26 @@ jobs:
           & C:\msys64\usr\bin\pacman.exe -S --needed --noconfirm make diffutils
           if ($LASTEXITCODE) { throw 'MSYS2 build prerequisites failed' }
       - name: Shared frontend checks
-        if: matrix.target == 'x86_64-pc-windows-msvc'
+        if: matrix.target == 'x86_64-pc-windows-msvc' && !inputs.binding_check_only
         shell: pwsh
         run: |
           pnpm --dir frontend typecheck
           if ($LASTEXITCODE) { throw 'Frontend typecheck failed' }
           pnpm --dir frontend test
           if ($LASTEXITCODE) { throw 'Frontend tests failed' }
+      - name: Native Whisper ABI layout checks
+        shell: pwsh
+        run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage bindings
       - name: Build and test native audio tools
+        if: '!inputs.binding_check_only'
         shell: pwsh
         run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage ffmpeg
       - name: Build native summary engine
+        if: '!inputs.binding_check_only'
         shell: pwsh
         run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage helper
       - name: Build and package Tetro Dev
+        if: '!inputs.binding_check_only'
         shell: pwsh
         run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage app
       - name: Retain internal installer and build evidence
@@ -82,6 +94,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
       - name: Native Rust regression checks
+        if: '!inputs.binding_check_only'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
