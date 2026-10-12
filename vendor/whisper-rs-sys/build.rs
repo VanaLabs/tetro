@@ -152,8 +152,17 @@ fn main() {
             Ok(b) => {
                 if windows_arm {
                     let generated = b.to_string();
-                    assert!(generated.contains("pub n_threads:") && generated.contains("pub greedy:"),
-                        "Windows ARM64 bindings must contain complete Whisper parameter records");
+                    // Minimal Rust toolchains may omit rustfmt. Bindgen then emits
+                    // spaced tokens, so inspect the record independently of formatting.
+                    let compact: String = generated.split_whitespace().collect();
+                    let params = compact
+                        .split("pubstructwhisper_full_params{")
+                        .nth(1)
+                        .and_then(|record| record.split('}').next())
+                        .unwrap_or("");
+                    assert!(params.contains("pubn_threads:") && params.contains("pubgreedy:"),
+                        "Windows ARM64 bindings must contain complete Whisper parameter records: {params}");
+                    println!("cargo:warning=Generated complete native Windows ARM64 Whisper parameters");
                 }
                 let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
                 b.write_to_file(out_path.join("bindings.rs"))
