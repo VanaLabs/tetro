@@ -100,20 +100,26 @@ fn main() {
     }
 
     println!("cargo:rerun-if-changed=wrapper.h");
+    println!("cargo:rerun-if-changed=whisper.cpp");
 
     let out = PathBuf::from(env::var("OUT_DIR").unwrap());
     let whisper_root = out.join("whisper.cpp/");
 
     if !whisper_root.exists() {
         std::fs::create_dir_all(&whisper_root).unwrap();
-        fs_extra::dir::copy("./whisper.cpp", &out, &Default::default()).unwrap_or_else(|e| {
-            panic!(
-                "Failed to copy whisper sources into {}: {}",
-                whisper_root.display(),
-                e
-            )
-        });
     }
+    // Refresh vendored sources when Cargo reruns this script, including cached builds.
+    let copy_options = fs_extra::dir::CopyOptions {
+        overwrite: true,
+        ..Default::default()
+    };
+    fs_extra::dir::copy("./whisper.cpp", &out, &copy_options).unwrap_or_else(|e| {
+        panic!(
+            "Failed to copy whisper sources into {}: {}",
+            whisper_root.display(),
+            e
+        )
+    });
 
     if env::var("WHISPER_DONT_GENERATE_BINDINGS").is_ok() {
         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))

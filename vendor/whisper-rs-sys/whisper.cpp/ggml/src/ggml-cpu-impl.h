@@ -137,7 +137,7 @@ static inline ggml_bf16_t ggml_compute_fp32_to_bf16(float s) {
 //
 #include <arm_neon.h>
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && !defined(__clang__)
 
 typedef uint16_t ggml_fp16_internal_t;
 
