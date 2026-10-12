@@ -6,7 +6,8 @@ matching Windows runner and retains internal installers and build records.
 It does not publish releases or update the consumer manifest.
 
 The build host needs Rust, Node/pnpm from the workflow, MSVC for the target,
-Ninja, and MSYS2 GNU make. Initialize the matching MSVC environment, then run:
+native-host LLVM with `clang-cl` and `libclang`, Ninja, and MSYS2 GNU make.
+Initialize the matching MSVC environment, then run:
 
 ```powershell
 ./frontend/scripts/windows/build-dev.ps1 -Target x86_64-pc-windows-msvc
@@ -16,6 +17,7 @@ Ninja, and MSYS2 GNU make. Initialize the matching MSVC environment, then run:
 The script builds FFmpeg from the authenticated, SHA256-pinned 8.0.3 source
 using the restricted Tetro audio recipe. The resulting target, size, and hash
 are embedded in this Dev app and verified before bundling and execution.
+ARM64 also uses Clang for the summary engine, with the Windows MSVC ABI and SDK.
 Existing consumer/macOS pins are retained. An internal build does not enable
 consumer Windows distribution or a public dependency download.
 

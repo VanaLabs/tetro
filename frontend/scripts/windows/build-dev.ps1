@@ -64,6 +64,7 @@ if ($Target -eq 'aarch64-pc-windows-msvc') {
   # llama.cpp's ARM backend requires Clang; retain the Windows MSVC ABI and SDK.
   $env:CC_aarch64_pc_windows_msvc = Join-Path $llvm 'clang-cl.exe'
   $env:CXX_aarch64_pc_windows_msvc = Join-Path $llvm 'clang-cl.exe'
+  $env:CXXFLAGS_aarch64_pc_windows_msvc = '/EHsc'
 }
 Write-Host '::notice title=Windows Dev stage::Building pinned FFmpeg with the matching LLVM/MSVC toolchain'
 Invoke-Checked $bash @('--noprofile','--norc','frontend/scripts/ffmpeg/build-windows.sh',$Target)
