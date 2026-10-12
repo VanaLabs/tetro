@@ -133,6 +133,18 @@ if ($Stage -in @('all','helper')) {
   $imports = & dumpbin.exe /DEPENDENTS (Join-Path $releaseDir 'llama-helper.exe')
   if ($LASTEXITCODE) { throw 'Could not inspect summary sidecar runtime dependencies' }
   [IO.File]::WriteAllText((Join-Path $recordDir 'summary-runtime-imports.txt'), ($imports -join "`n"), (New-Object Text.UTF8Encoding($false)))
+  # Exercise the actual target helper/model, without using audio hardware.
+  $catalog = Join-Path $root 'frontend\src-tauri\model-fingerprints.json'
+  $qwenSpec = ([IO.File]::ReadAllText($catalog) | ConvertFrom-Json).'llm-qwen/Qwen3.5-2B-Q4_K_M.gguf'
+  if ($qwenSpec.source -notmatch '^https://huggingface\.co/Vana-Labs/llm-qwen/resolve/[0-9a-f]{40}/Qwen3\.5-2B-Q4_K_M\.gguf$') { throw 'Summary smoke requires the pinned Vana Labs model source' }
+  $qwen = Join-Path $root 'target\windows-dev\dependencies\summary\Qwen3.5-2B-Q4_K_M.gguf'
+  New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($qwen)) -Force | Out-Null
+  if (!(Test-Path $qwen) -or (Get-Item $qwen).Length -ne $qwenSpec.size -or (Get-FileHash $qwen -Algorithm SHA256).Hash -ne $qwenSpec.sha256) {
+    Invoke-WebRequest -Uri $qwenSpec.source -OutFile "$qwen.part"
+    if ((Get-Item "$qwen.part").Length -ne $qwenSpec.size -or (Get-FileHash "$qwen.part" -Algorithm SHA256).Hash -ne $qwenSpec.sha256) { throw 'Summary smoke model failed catalog fingerprint verification' }
+    Move-Item "$qwen.part" $qwen -Force
+  }
+  & (Join-Path $PSScriptRoot 'smoke-summary.ps1') -Helper (Join-Path $releaseDir 'llama-helper.exe') -Model $qwen -RuntimeDirectory $runtimeDir -Catalog $catalog -OutputFile (Join-Path $recordDir 'summary-model-smoke.json') -Target $Target
 }
 if ($Stage -in @('all','app')) {
   Write-Host '::notice title=Windows Dev stage::Summary sidecar built; compiling and packaging Tetro Dev'

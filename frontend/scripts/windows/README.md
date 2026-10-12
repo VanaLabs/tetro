@@ -23,6 +23,8 @@ runner. Whisper uses bindgen 0.72.1 to resolve forward-declared records with
 LLVM 22. ARM64 binaries and ABI layout checks execute natively.
 The header-only ABI check uses a separate Cargo directory; model CPU decoding
 runs after packaging and the native app regression suite.
+The summary helper also decodes a synthetic prompt with fingerprint-verified
+Qwen 3.5 2B before packaging. These model checks do not use audio devices.
 Existing consumer/macOS pins are retained. An internal build does not enable
 consumer Windows distribution or a public dependency download.
 
