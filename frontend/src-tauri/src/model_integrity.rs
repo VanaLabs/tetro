@@ -45,7 +45,7 @@ pub fn summary(path:&Path)->anyhow::Result<()> {
         let sha=format!("{:x}",Sha256::digest(b"good"));verify_expected(&p,"test",&sha,4).unwrap();
         let modified=std::fs::metadata(&p).unwrap().modified().unwrap();
         std::fs::write(&p,b"evil").unwrap();
-        std::fs::File::open(&p).unwrap().set_modified(modified).unwrap();
+        std::fs::OpenOptions::new().write(true).open(&p).unwrap().set_modified(modified).unwrap();
         assert_eq!(std::fs::metadata(&p).unwrap().modified().unwrap(),modified);
         assert!(verify_expected(&p,"test",&sha,4).is_err());
     }

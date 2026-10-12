@@ -5,6 +5,8 @@ pub mod system_monitor;
 pub mod parallel_processor;
 pub mod parallel_commands;
 pub mod local_models;
+#[cfg(test)]
+mod cpu_smoke;
 // pub mod stderr_suppressor;
 
 pub use whisper_engine::*;

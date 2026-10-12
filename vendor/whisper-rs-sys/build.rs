@@ -125,7 +125,18 @@ fn main() {
         let _: u64 = std::fs::copy("src/bindings.rs", out.join("bindings.rs"))
             .expect("Failed to copy bindings.rs");
     } else {
-        let bindings = bindgen::Builder::default().header("wrapper.h");
+        let windows_arm = target == "aarch64-pc-windows-msvc";
+        let bindings = if windows_arm {
+            // Use C++ record resolution for the bundled forward-declared C API.
+            // The header retains extern "C" and the native Windows ARM64 ABI.
+            bindgen::Builder::default()
+                .header(whisper_root.join("include/whisper.h").to_string_lossy())
+                .clang_arg(format!("--target={target}"))
+                .clang_args(["-x", "c++", "-std=c++17"])
+                .clang_arg(format!("-I{}", whisper_root.join("ggml/include").display()))
+        } else {
+            bindgen::Builder::default().header("wrapper.h")
+        };
 
         #[cfg(feature = "metal")]
         let bindings = bindings.header("whisper.cpp/ggml/include/ggml-metal.h");
@@ -139,11 +150,17 @@ fn main() {
 
         match bindings {
             Ok(b) => {
+                if windows_arm {
+                    let generated = b.to_string();
+                    assert!(generated.contains("pub n_threads:") && generated.contains("pub greedy:"),
+                        "Windows ARM64 bindings must contain complete Whisper parameter records");
+                }
                 let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
                 b.write_to_file(out_path.join("bindings.rs"))
                     .expect("Couldn't write bindings!");
             }
             Err(e) => {
+                assert!(!windows_arm, "Windows ARM64 native binding generation failed: {e}");
                 println!("cargo:warning=Unable to generate bindings: {}", e);
                 println!("cargo:warning=Using bundled bindings.rs, which may be out of date");
                 // copy src/bindings.rs to OUT_DIR
