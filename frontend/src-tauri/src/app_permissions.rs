@@ -100,8 +100,30 @@ pub async fn open_app_permission_settings(permission: String) -> Result<(), Stri
         if !status.success() { return Err("Could not open System Settings".into()); }
         Ok(())
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        let uri = windows_settings_uri(&permission)?;
+        let explorer = std::env::var_os("SystemRoot")
+            .map(std::path::PathBuf::from)
+            .ok_or("Could not locate Windows Settings")?
+            .join("explorer.exe");
+        std::process::Command::new(explorer).arg(uri).spawn()
+            .map_err(|_| "Could not open Windows Settings".to_string())?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     { let _ = permission; Err("Open your operating system's privacy settings".into()) }
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn windows_settings_uri(permission: &str) -> Result<&'static str, String> {
+    // Fixed OS destinations only; never launch a URI supplied by the webview.
+    match permission {
+        "microphone" => Ok("ms-settings:privacy-microphone"),
+        "system_audio" => Ok("ms-settings:sound"),
+        "notifications" => Ok("ms-settings:notifications"),
+        _ => Err("Unknown permission".into()),
+    }
 }
 
 static AUDIO_TEST: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -203,6 +225,16 @@ mod audio_access_tests {
     use super::{run_bounded_audio_probe, verify_audio_stream};
     use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
     use std::time::Duration;
+
+    #[test]
+    fn windows_settings_accept_only_known_permission_destinations() {
+        assert_eq!(super::windows_settings_uri("microphone").unwrap(), "ms-settings:privacy-microphone");
+        assert_eq!(super::windows_settings_uri("system_audio").unwrap(), "ms-settings:sound");
+        assert_eq!(super::windows_settings_uri("notifications").unwrap(), "ms-settings:notifications");
+        for unknown in ["", "https://example.com", "ms-settings:privacy", "microphone & calc.exe"] {
+            assert!(super::windows_settings_uri(unknown).is_err());
+        }
+    }
 
     #[tokio::test]
     async fn silent_or_invalid_samples_do_not_grant_or_deny_access() {

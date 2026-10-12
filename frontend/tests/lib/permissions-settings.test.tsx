@@ -9,6 +9,7 @@ const listeners = new Map<string, () => void>();
 let denyKeys = false;
 let savedKeyCount = 1;
 let recording = false;
+let platform = 'macos';
 let audioResult: string | Promise<string> | Error = 'inconclusive';
 let playbackFails = false;
 let playbackResult: Promise<void> | undefined;
@@ -23,7 +24,7 @@ class TestAudio {
 mock.module('@tauri-apps/api/core', () => ({ invoke: async (command: string, args: any) => {
   calls.push({ command, args });
   events.push(command);
-  if (command === 'get_app_permissions') return { platform: 'macos', microphone: 'denied', notifications: 'not_requested' };
+  if (command === 'get_app_permissions') return { platform, microphone: 'denied', notifications: 'not_requested' };
   if (command === 'get_recording_state') return { is_active: recording };
   if (command === 'check_saved_key_access') { if (denyKeys) throw new Error('Keychain access denied. Retry.'); return savedKeyCount; }
   if (command === 'test_system_audio_access') { if (audioResult instanceof Error) throw audioResult; return audioResult; }
@@ -35,12 +36,30 @@ const text = (view: ReactTestRenderer) => JSON.stringify(view.toJSON());
 const button = (view: ReactTestRenderer, label: string) => view.root.findAllByType('button').find(b => b.children.join('') === label)!;
 beforeEach(() => {
   calls.length = 0; events.length = 0; listeners.clear(); denyKeys = false; savedKeyCount = 1;
-  recording = false; audioResult = 'inconclusive'; playbackFails = false; playbackResult = undefined; TestAudio.instances.length = 0;
+  recording = false; platform = 'macos'; audioResult = 'inconclusive'; playbackFails = false; playbackResult = undefined; TestAudio.instances.length = 0;
   globalThis.Audio = TestAudio as any;
   globalThis.window = { addEventListener: (name: string, fn: () => void) => listeners.set(name, fn), removeEventListener: (name: string) => listeners.delete(name), dispatchEvent: () => true } as any;
 });
 afterAll(() => { globalThis.window = originalWindow; globalThis.Audio = originalAudio; mock.restore(); });
 async function mount() { let view!: ReactTestRenderer; await act(async () => { view = create(<PermissionsSettings />); await tick(); }); return view; }
+test('Windows permissions use OS settings without Mac-only prompts or an unsupported sound probe', async () => {
+  platform = 'windows';
+  const view = await mount();
+  const buttons = view.root.findAllByType('button');
+  expect(buttons.some(b => b.children.join('') === 'Request access')).toBe(false);
+  expect(buttons.some(b => b.children.join('') === 'Test access')).toBe(false);
+  expect(text(view)).not.toContain('macOS'); expect(text(view)).not.toContain('Keychain');
+  expect(text(view)).toContain('Let desktop apps access your microphone');
+  const settings = buttons.filter(b => b.children.join('') === 'Windows Settings');
+  expect(settings).toHaveLength(3);
+  for (const [index, permission] of ['microphone', 'system_audio', 'notifications'].entries()) {
+    await act(async () => { settings[index].props.onClick(); await tick(); });
+    expect(calls.at(-1)).toEqual({ command: 'open_app_permission_settings', args: { permission } });
+  }
+  expect(TestAudio.instances).toHaveLength(0);
+  expect(calls.some(c => c.command === 'request_app_permission' || c.command === 'test_system_audio_access')).toBe(false);
+  act(() => view.unmount());
+});
 test('opening the tab reads status without requesting permissions or touching Keychain', async () => {
   const view = await mount();
   expect(calls.map(c => c.command).sort()).toEqual(['get_app_permissions', 'get_recording_state']);

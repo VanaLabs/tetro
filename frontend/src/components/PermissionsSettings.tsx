@@ -20,6 +20,9 @@ export function PermissionsSettings({ onOpenModels }: { onOpenModels?: () => voi
   const refreshing = useRef(false);
   const busy = useRef(false);
   const sound = useRef<HTMLAudioElement | null>(null);
+  const isMac = snapshot?.platform === 'macos';
+  const isWindows = snapshot?.platform === 'windows';
+  const settingsLabel = isWindows ? 'Windows Settings' : 'System Settings';
   const refresh = useCallback(async () => {
     if (refreshing.current) return;
     refreshing.current = true;
@@ -102,10 +105,10 @@ export function PermissionsSettings({ onOpenModels }: { onOpenModels?: () => voi
   });
   const nativeRow = (id: 'microphone' | 'notifications', name: string, hint: string) => {
     const access = snapshot?.[id];
-    const canRequest = access === 'not_requested' || access === 'unknown';
-    return <SettingRow label={<>{name}<span className="tetro-permission-status" role="status">{loading ? 'Checking…' : labels[access ?? 'unknown']}</span></>} hint={hint}>
+    const canRequest = isMac && (access === 'not_requested' || access === 'unknown');
+    return <SettingRow label={<>{name}<span className="tetro-permission-status" role="status">{loading ? 'Checking…' : isWindows ? 'Manage in Windows' : labels[access ?? 'unknown']}</span></>} hint={hint}>
       {canRequest && <button type="button" className="tetro-key" disabled={!!pending || loading} onClick={() => void request(id)}>{pending === id ? 'Waiting…' : 'Request access'}</button>}
-      <button type="button" className="tetro-key" disabled={!!pending || loading} onClick={() => void openSettings(id)}>System Settings</button>
+      <button type="button" className="tetro-key" disabled={!!pending || loading} onClick={() => void openSettings(id)}>{settingsLabel}</button>
     </SettingRow>;
   };
 
@@ -114,20 +117,25 @@ export function PermissionsSettings({ onOpenModels }: { onOpenModels?: () => voi
       <p>Check what Tetro can access and retry a permission when needed.</p>
       <button type="button" className="tetro-key" disabled={loading || !!pending} onClick={() => { setError(''); setAudio('unchecked'); setKeys('unchecked'); void refresh(); }}>Refresh status</button>
     </div>
-    {snapshot && snapshot.platform !== 'macos' && <p className="tetro-setting-note">Permission checks are available on macOS. On this system, manage access in your operating system settings.</p>}
+    {isWindows && <p className="tetro-setting-note">Manage microphone and notification access in Windows Settings.</p>}
+    {snapshot && !isMac && !isWindows && <p className="tetro-setting-note">Manage access in your operating system settings.</p>}
     <SettingGroup title="Recording">
-      {nativeRow('microphone', 'Microphone', 'Records your voice. If access was denied, enable Tetro in Privacy & Security → Microphone.')}
-      <SettingRow label={<>Computer audio<span className="tetro-permission-status" role="status">{pending === 'system_audio' ? 'Testing audio…' : audio === 'verified' ? 'Audio received' : audio === 'inconclusive' ? 'Couldn’t verify' : 'Not checked'}</span></>} hint="Tetro plays a quiet test sound and checks audio access for up to six seconds. Nothing is saved.">
-        <button type="button" className="tetro-key" disabled={!!pending || recording || loading} onClick={() => void testAudio()}>{pending === 'system_audio' ? 'Testing…' : 'Test access'}</button>
-        <button type="button" className="tetro-key" disabled={!!pending || loading} onClick={() => void openSettings('system_audio')}>System Settings</button>
+      {nativeRow('microphone', 'Microphone', isWindows
+        ? 'Records your voice. In Privacy & security → Microphone, turn on Microphone access and Let desktop apps access your microphone.'
+        : 'Records your voice. If access was denied, enable Tetro in Privacy & Security → Microphone.')}
+      <SettingRow label={<>Computer audio{isMac && <span className="tetro-permission-status" role="status">{pending === 'system_audio' ? 'Testing audio…' : audio === 'verified' ? 'Audio received' : audio === 'inconclusive' ? 'Couldn’t verify' : 'Not checked'}</span>}</>} hint={isWindows
+        ? 'Records sound from your selected speakers or headphones. Choose the output device in Audio before recording.'
+        : 'Tetro plays a quiet test sound and checks audio access for up to six seconds. Nothing is saved.'}>
+        {isMac && <button type="button" className="tetro-key" disabled={!!pending || recording || loading} onClick={() => void testAudio()}>{pending === 'system_audio' ? 'Testing…' : 'Test access'}</button>}
+        <button type="button" className="tetro-key" disabled={!!pending || loading} onClick={() => void openSettings('system_audio')}>{settingsLabel}</button>
       </SettingRow>
     </SettingGroup>
-    <p className="tetro-setting-note">Computer audio is listed under Privacy & Security → Audio Capture, or Screen & System Audio Recording, depending on your macOS version.{recording ? ' Finish your recording before running an audio test.' : ''}</p>
+    {isMac && <p className="tetro-setting-note">Computer audio is listed under Privacy & Security → Audio Capture, or Screen & System Audio Recording, depending on your macOS version.{recording ? ' Finish your recording before running an audio test.' : ''}</p>}
     <SettingGroup title="Optional access">
       {nativeRow('notifications', 'Notifications', 'Shows recording and meeting reminders. Your notification preferences are in General.')}
-      <SettingRow label={<>Saved API keys<span className="tetro-permission-status" role="status">{pending === 'keychain' ? 'Waiting for Keychain…' : keys === 'available' ? 'Access confirmed' : keys === 'empty' ? 'Nothing to check yet' : keys === 'unavailable' ? 'Access unavailable' : 'Not checked'}</span></>} hint={keys === 'empty'
-        ? 'No API keys are saved. Add a provider key in Models → External models, then return here to check Keychain access. Built-in models do not need an API key.'
-        : 'Checks whether Tetro can read API keys you have saved in Models. Save a key first to use this check. macOS may ask for Keychain access; approval takes effect without restarting.'}>
+      <SettingRow label={<>Saved API keys<span className="tetro-permission-status" role="status">{pending === 'keychain' ? isMac ? 'Waiting for Keychain…' : 'Checking…' : keys === 'available' ? 'Access confirmed' : keys === 'empty' ? 'Nothing to check yet' : keys === 'unavailable' ? 'Access unavailable' : 'Not checked'}</span></>} hint={keys === 'empty'
+        ? `No API keys are saved. Add a provider key in Models → External models, then return here to check ${isMac ? 'Keychain access' : 'access'}. Built-in models do not need an API key.`
+        : `Checks whether Tetro can read API keys you have saved in Models. Save a key first to use this check.${isMac ? ' macOS may ask for Keychain access; approval takes effect without restarting.' : ''}`}>
         <button type="button" className="tetro-key" disabled={!!pending} onClick={() => void run('keychain', async () => {
           try {
             const count = await invoke<number>('check_saved_key_access');
@@ -138,7 +146,7 @@ export function PermissionsSettings({ onOpenModels }: { onOpenModels?: () => voi
         {keys === 'empty' && onOpenModels && <button type="button" className="tetro-key" disabled={!!pending} onClick={onOpenModels}>Open models</button>}
       </SettingRow>
     </SettingGroup>
-    <p className="tetro-setting-note">If macOS asks you to quit and reopen Tetro after changing a recording permission, finish your recording first. Return here to refresh the status. Local models work without Keychain access.</p>
+    {isMac && <p className="tetro-setting-note">If macOS asks you to quit and reopen Tetro after changing a recording permission, finish your recording first. Return here to refresh the status. Local models work without Keychain access.</p>}
     {error && <p role="alert" className="tetro-permission-error">{error}</p>}
   </div>;
 }
