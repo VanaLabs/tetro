@@ -18,8 +18,9 @@ The script builds FFmpeg from the authenticated, SHA256-pinned 8.0.3 source
 using the restricted Tetro audio recipe. The resulting target, size, and hash
 are embedded in this Dev app and verified before bundling and execution.
 ARM64 also uses Clang for the summary engine, with the Windows MSVC ABI and SDK.
-CI uses x64 Rust/compiler tools on the ARM runner to avoid incomplete records
-from ARM-host libclang. ARM64 binaries and ABI layout tests execute natively.
+CI uses x64 Rust/compiler tools with explicit ARM64 target flags on the ARM
+runner. Whisper uses bindgen 0.72.1 to resolve forward-declared records with
+LLVM 22. ARM64 binaries and ABI layout checks execute natively.
 The header-only ABI check uses a separate Cargo directory; model CPU decoding
 runs after packaging and the native app regression suite.
 Existing consumer/macOS pins are retained. An internal build does not enable

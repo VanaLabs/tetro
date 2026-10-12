@@ -128,12 +128,10 @@ fn main() {
     } else {
         let windows_arm = target == "aarch64-pc-windows-msvc";
         let bindings = if windows_arm {
-            // Use C++ record resolution for the bundled forward-declared C API.
-            // The header retains extern "C" and the native Windows ARM64 ABI.
+            // Generate from the bundled C API using the Windows ARM64 ABI.
             bindgen::Builder::default()
                 .header(whisper_root.join("include/whisper.h").to_string_lossy())
                 .clang_arg(format!("--target={target}"))
-                .clang_args(["-x", "c++", "-std=c++17"])
                 .clang_arg(format!("-I{}", whisper_root.join("ggml/include").display()))
         } else {
             bindgen::Builder::default().header("wrapper.h")

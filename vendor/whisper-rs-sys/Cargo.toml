@@ -47,7 +47,8 @@ name = "whisper_rs_sys"
 path = "src/lib.rs"
 
 [build-dependencies.bindgen]
-version = "0.69"
+# LLVM 22 returns forward declarations; 0.72.1 resolves their definitions.
+version = "=0.72.1"
 
 [build-dependencies.cfg-if]
 version = "1"
