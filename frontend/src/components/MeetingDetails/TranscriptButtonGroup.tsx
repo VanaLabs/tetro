@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
-import { Copy, FolderOpen, RefreshCw, Globe } from 'lucide-react';
+import { Copy, FolderOpen, RefreshCw, Globe, Search } from 'lucide-react';
 import { LanguageSelection } from '@/components/LanguageSelection';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
@@ -15,6 +15,7 @@ import { MeetingVersions } from '@/components/tetro/MeetingVersions';
 interface TranscriptButtonGroupProps {
   transcriptCount: number;
   onCopyTranscript: () => void;
+  onFindTranscript?: () => void;
   onOpenMeetingFolder: () => Promise<void>;
   meetingId?: string;
   meetingFolderPath?: string | null;
@@ -26,6 +27,7 @@ interface TranscriptButtonGroupProps {
 export function TranscriptButtonGroup({
   transcriptCount,
   onCopyTranscript,
+  onFindTranscript,
   onOpenMeetingFolder,
   meetingId,
   meetingFolderPath,
@@ -48,6 +50,7 @@ export function TranscriptButtonGroup({
     <div className="flex items-center gap-2 min-w-0">
       <ButtonGroup>
         <Button variant="outline" size="sm" title="Transcription language" aria-label="Transcription language" onClick={() => setLanguageOpen(true)}><Globe /></Button>
+        {onFindTranscript && <Button variant="outline" size="sm" title="Find in transcript" aria-label="Find in transcript" onClick={onFindTranscript} disabled={transcriptCount === 0}><Search /><span className="hidden @[30rem]:inline">Find</span></Button>}
         <Button
           variant="outline"
           size="sm"
@@ -72,7 +75,7 @@ export function TranscriptButtonGroup({
 
             onOpenMeetingFolder();
           }}
-          title="Show the recording in Finder"
+          title="Open recording folder"
           aria-label="Open recording folder"
         >
           <FolderOpen className="@[30rem]:mr-2" size={18} />
