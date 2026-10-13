@@ -34,6 +34,15 @@ pub fn install(app: &App) -> tauri::Result<()> {
     ])?;
     let help_menu = Submenu::with_items(app, "Help", true, &[&help, &shortcuts])?;
     app.set_menu(Menu::with_items(app, &[&application, &file, &edit, &window, &help_menu])?)?;
+    #[cfg(target_os = "windows")]
+    {
+        use tauri::Manager;
+        // Keep the native commands and accelerators, without a menu bar above
+        // Tetro's own navigation. Window controls and the tray remain available.
+        if let Some(window) = app.get_webview_window("main") {
+            window.hide_menu()?;
+        }
+    }
     #[cfg(target_os = "macos")]
     { window.set_as_windows_menu_for_nsapp()?; help_menu.set_as_help_menu_for_nsapp()?; }
     app.on_menu_event(|app, event| match event.id.as_ref() {
