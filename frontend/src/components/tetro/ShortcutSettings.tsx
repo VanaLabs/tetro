@@ -8,9 +8,11 @@ import { Switch } from '@/components/ui/switch';
 
 type Shortcuts = { toggle_recording: string; mark_moment: string };
 const SYMBOL: Record<string, string> = { Super: '⌘', Command: '⌘', Cmd: '⌘', Control: '⌃', Ctrl: '⌃', Alt: '⌥', Option: '⌥', Shift: '⇧' };
+const KEY_NAME: Record<string, string> = { Super: 'Win', Command: 'Win', Cmd: 'Win', Control: 'Ctrl', Option: 'Alt' };
+const onMac = () => typeof navigator !== 'undefined' && navigator.platform.startsWith('Mac');
 
-/** "Alt+Super+R" → "⌥⌘R" */
-export const prettyShortcut = (s: string) => s.split('+').map(p => SYMBOL[p] ?? (p.startsWith('Key') ? p.slice(3) : p.startsWith('Digit') ? p.slice(5) : p)).join('');
+/** Show the same saved shortcut using the current system's key labels. */
+export const prettyShortcut = (s: string, mac = onMac()) => s.split('+').map(p => (mac ? SYMBOL[p] : KEY_NAME[p]) ?? (p.startsWith('Key') ? p.slice(3) : p.startsWith('Digit') ? p.slice(5) : p)).join(mac ? '' : '+');
 
 /** Turns a key press into the plugin's shortcut syntax; null until a non-modifier key is pressed with ⌘/⌃/⌥. */
 function fromEvent(e: KeyboardEvent): string | null {
@@ -42,6 +44,7 @@ function ShortcutField({ value, onChange, label }: { value: string; onChange: (v
 
 /** Settings → Recordings → Shortcuts. They work while Tetro is in the background. */
 export function ShortcutSettings() {
+  const isMac = onMac();
   const [shortcuts, setShortcuts] = useState<Shortcuts | null>(null);
   useEffect(() => { invoke<Shortcuts>('api_get_shortcuts').then(setShortcuts).catch(() => setShortcuts({ toggle_recording: 'Alt+Super+R', mark_moment: 'Alt+Super+M' })); }, []);
   const save = async (next: Shortcuts) => {
@@ -49,16 +52,16 @@ export function ShortcutSettings() {
     catch (e) { toast.error('Couldn’t use that shortcut', { description: String(e) }); }
   };
   const [callDetection, setCallDetection] = useState(true);
-  useEffect(() => { invoke<boolean>('api_get_call_detection').then(setCallDetection).catch(() => {}); }, []);
+  useEffect(() => { if (isMac) invoke<boolean>('api_get_call_detection').then(setCallDetection).catch(() => {}); }, [isMac]);
   const toggleCallDetection = async (on: boolean) => {
     setCallDetection(on);
     try { await invoke('api_set_call_detection', { enabled: on }); } catch (e) { setCallDetection(!on); toast.error(String(e)); }
   };
   if (!shortcuts) return null;
-  return <SettingGroup title="Calls and shortcuts">
-    <SettingRow label="Notice calls" hint="When another app turns the microphone on, Tetro shows a dot by the menu-bar T and one quiet notification.">
+  return <SettingGroup title={isMac ? 'Calls and shortcuts' : 'Shortcuts'}>
+    {isMac && <SettingRow label="Notice calls" hint="When another app turns the microphone on, Tetro shows a dot by the menu-bar T and one quiet notification.">
       <Switch checked={callDetection} onCheckedChange={v => void toggleCallDetection(v)} aria-label="Notice calls" />
-    </SettingRow>
+    </SettingRow>}
     <SettingRow label="Start or stop recording" hint="Tetro stays in the background, so your call keeps focus.">
       <ShortcutField label="start or stop recording" value={shortcuts.toggle_recording} onChange={v => void save({ ...shortcuts, toggle_recording: v })} />
     </SettingRow>

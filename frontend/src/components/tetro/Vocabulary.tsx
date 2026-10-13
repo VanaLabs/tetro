@@ -53,7 +53,7 @@ export function VocabularyEditor() {
     <div className="tetro-vocab">
       {terms?.map(term => <span key={term} className="tetro-vocab-chip">{term}<button disabled={busy} onClick={() => void save(terms.filter(t => t !== term))} aria-label={`Remove ${term}`} title="Remove"><X /></button></span>)}
       <input disabled={terms === null || busy} value={draft} onChange={e => setDraft(e.target.value)} placeholder={terms?.length ? 'Add another…' : 'e.g. Aram Petrosyan, Vana Labs, OKR'} aria-label="Add a name or term"
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); void add(); } }} />
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void add(); } }} />
       <button className="tetro-key" disabled={terms === null || busy || !draft.trim()} onClick={() => void add()}>{busy ? 'Saving…' : 'Add'}</button>
     </div>
     {error && <p role="alert">{error} <button className="tetro-link" onClick={() => void load()}>Try again</button></p>}

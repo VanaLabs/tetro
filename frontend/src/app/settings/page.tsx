@@ -3,7 +3,7 @@
 import { PermissionsSettings } from '@/components/PermissionsSettings';
 import { BetaSettings } from '@/components/BetaSettings';
 import { StorageSettings } from '@/components/StorageSettings';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Settings2, Mic, Database as DatabaseIcon, SparkleIcon, Boxes, HardDrive, FlaskConical, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { invoke } from '@tauri-apps/api/core';
@@ -32,6 +32,8 @@ export default function SettingsPage() {
 
   const [activeTab, setActiveTab] = useState('general');
   const [modelsSection, setModelsSection] = useState<ModelsSection>('transcription');
+  const settingsScroll = useRef<HTMLDivElement>(null);
+  useEffect(() => { settingsScroll.current?.scrollTo({ top: 0 }); }, [activeTab, modelsSection]);
   const [browseTranscriptionOnOpen, setBrowseTranscriptionOnOpen] = useState(false);
   const [browseSummaryOnOpen, setBrowseSummaryOnOpen] = useState(false);
   const openModels = (section: ModelsSection) => { setModelsSection(section); if (section === 'transcription') setBrowseTranscriptionOnOpen(true); if (section === 'summary') setBrowseSummaryOnOpen(true); setActiveTab('models'); };
@@ -93,7 +95,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Scrollable Content */}
-      <div data-settings-scroll className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
+      <div ref={settingsScroll} data-settings-scroll className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
         <div className="tetro-settings-sheet">
           <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="tetro-settings-layout">
             <TabsList className="tetro-settings-nav" aria-label="Settings sections">
