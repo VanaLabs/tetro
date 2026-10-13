@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.architecture == 'x64' && '[{"runner":"windows-2022","target":"x86_64-pc-windows-msvc","msvc":"amd64"}]' || inputs.architecture == 'arm64' && '[{"runner":"windows-11-arm","target":"aarch64-pc-windows-msvc","msvc":"amd64_arm64"}]' || '[{"runner":"windows-2022","target":"x86_64-pc-windows-msvc","msvc":"amd64"},{"runner":"windows-11-arm","target":"aarch64-pc-windows-msvc","msvc":"amd64_arm64"}]') }}
+        include: ${{ fromJSON(inputs.architecture == 'x64' && '[{"runner":"windows-2022","target":"x86_64-pc-windows-msvc","msvc":"amd64"}]' || inputs.architecture == 'arm64' && '[{"runner":"windows-11-arm","target":"aarch64-pc-windows-msvc","msvc":"arm64"}]' || '[{"runner":"windows-2022","target":"x86_64-pc-windows-msvc","msvc":"amd64"},{"runner":"windows-11-arm","target":"aarch64-pc-windows-msvc","msvc":"arm64"}]') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     steps:
@@ -48,11 +48,10 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          # Build tools use the mature x64 libclang on either runner. ARM64
-          # target executables still run natively on the Windows ARM runner.
-          rustup toolchain install 1.97.1-x86_64-pc-windows-msvc --profile minimal --force-non-host
+          # Use native build tools and target executables on each Windows runner.
+          rustup toolchain install 1.97.1 --profile minimal
           if ($LASTEXITCODE) { throw 'Rust install failed' }
-          rustup override set 1.97.1-x86_64-pc-windows-msvc
+          rustup override set 1.97.1
           rustup target add ${{ matrix.target }}
           npm install --global pnpm@11.22.0
           if ($LASTEXITCODE) { throw 'pnpm install failed' }

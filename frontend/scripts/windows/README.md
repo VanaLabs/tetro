@@ -18,8 +18,8 @@ The script builds FFmpeg from the authenticated, SHA256-pinned 8.0.3 source
 using the restricted Tetro audio recipe. The resulting target, size, and hash
 are embedded in this Dev app and verified before bundling and execution.
 ARM64 also uses Clang for the summary engine, with the Windows MSVC ABI and SDK.
-CI uses x64 Rust/compiler tools with explicit ARM64 target flags on the ARM
-runner. Whisper uses bindgen 0.72.1 to resolve forward-declared records with
+CI uses native Rust/compiler tools on each runner. Whisper uses bindgen
+0.72.1 to resolve forward-declared records with
 LLVM 22. ARM64 binaries and ABI layout checks execute natively.
 The header-only ABI check uses a separate Cargo directory; model CPU decoding
 runs after packaging and the native app regression suite.
@@ -37,6 +37,9 @@ Dev keeps `am.vanalabs.tetro.dev`, separate profile/credentials, visible Dev
 marking, and no consumer updater. The per-user NSIS installer requires Windows
 11 build22000 or later. Internal Dev installers are unsigned; no Windows
 certificate or paid signing service is configured by this workflow.
+Microsoft runtime signatures and target machine types are checked before
+staging. The ARM SDK's x64 emulation DLL is excluded from native ARM64 bundles;
+app/helper imports must not depend on it.
 
 Outputs: `target/windows-dev/<source-commit>/<target>/`. Keep matching installer,
 dependency/configuration hashes, source commit, and device results together.

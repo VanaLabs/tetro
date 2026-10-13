@@ -44,11 +44,26 @@ $crt = @(Get-ChildItem $redistRoot -Directory -Filter 'Microsoft.VC*.CRT' | Sort
 if (!$crt) { throw 'Matching Microsoft redistributable CRT directory is missing' }
 $runtimeDir = Join-Path $root 'frontend\src-tauri\binaries\msvc-runtime'
 New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
+# This is an owned generated staging folder; do not retain another target's DLLs.
+Get-ChildItem $runtimeDir -Filter '*.dll' | Remove-Item
+$payloadMachine = if ($Target -eq 'aarch64-pc-windows-msvc') { 0xaa64 } else { 0x8664 }
 $runtimeRecords = @()
+$excludedRuntime = @()
 foreach ($dll in Get-ChildItem $crt.FullName -Filter '*.dll') {
   $signature = Get-AuthenticodeSignature $dll.FullName
   if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') {
     throw "Microsoft CRT signature verification failed: $($dll.Name)"
+  }
+  $bytes = [IO.File]::ReadAllBytes($dll.FullName)
+  $pe = [BitConverter]::ToInt32($bytes,60)
+  $machine = [BitConverter]::ToUInt16($bytes,$pe+4)
+  if ($machine -ne $payloadMachine) {
+    # ARM's redist also carries this x64-emulation component. Native ARM64
+    # apps use vcruntime140.dll; fail if an executable imports the excluded DLL.
+    if ($Target -ne 'aarch64-pc-windows-msvc' -or $dll.Name -ne 'vcruntime140_1.dll' -or $machine -ne 0x8664) { throw "Unexpected Microsoft CRT architecture: $($dll.Name), machine $machine" }
+    $excludedRuntime += [ordered]@{Name=$dll.Name;Machine='x64';Reason='Emulation component outside the native ARM64 payload';SHA256=(Get-FileHash $dll.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
+    Write-Host "Excluding signed x64 emulation runtime from native ARM64 package: $($dll.Name)"
+    continue
   }
   Copy-Item $dll.FullName $runtimeDir
   $runtimeRecords += [ordered]@{Name=$dll.Name;SHA256=(Get-FileHash $dll.FullName -Algorithm SHA256).Hash.ToLowerInvariant();Publisher=$signature.SignerCertificate.Subject;Authenticode=$signature.Status.ToString()}
@@ -60,7 +75,7 @@ $bash = 'C:\msys64\usr\bin\bash.exe'
 if (!(Test-Path $bash)) { throw 'MSYS2 GNU make/bash are required for the pinned FFmpeg source build' }
 if (!(Get-Command cl.exe -ErrorAction SilentlyContinue)) { throw 'Initialize the matching MSVC developer environment first' }
 # LLVM accepts upstream's empty C initializers, which newer ARM MSVC rejects.
-# Prefer the native-host LLVM installation so bindgen can load its libclang too.
+# Select host-native LLVM so bindgen can load libclang without emulation.
 $llvmCandidates = @((Join-Path $env:VCINSTALLDIR 'Tools\Llvm\ARM64\bin'),(Join-Path $env:VCINSTALLDIR 'Tools\Llvm\x64\bin'),'C:\Program Files\LLVM\bin')
 $rustHost = ((& rustc -vV) | Where-Object {$_ -like 'host:*'}) -replace '^host:\s*',''
 $hostMachine = if ($rustHost -like 'aarch64-*') { 0xaa64 } else { 0x8664 }
@@ -132,6 +147,7 @@ if ($Stage -in @('all','helper')) {
   Copy-Item (Join-Path $releaseDir 'llama-helper.exe') (Join-Path $root "frontend\src-tauri\binaries\llama-helper-$Target.exe")
   $imports = & dumpbin.exe /DEPENDENTS (Join-Path $releaseDir 'llama-helper.exe')
   if ($LASTEXITCODE) { throw 'Could not inspect summary sidecar runtime dependencies' }
+  if ($Target -eq 'aarch64-pc-windows-msvc' -and ($imports -join "`n") -match '(?im)^\s*vcruntime140_1\.dll\s*$') { throw 'Native ARM64 summary helper imports the excluded x64 runtime' }
   [IO.File]::WriteAllText((Join-Path $recordDir 'summary-runtime-imports.txt'), ($imports -join "`n"), (New-Object Text.UTF8Encoding($false)))
   # Exercise the actual target helper/model, without using audio hardware.
   $catalog = Join-Path $root 'frontend\src-tauri\model-fingerprints.json'
@@ -163,6 +179,10 @@ console.log('App, sidecars and ONNX DLLs all match $Target.');
   $inspect = $inspect.Replace("'./frontend/scripts/windows/pe.mjs'", "'../../frontend/scripts/windows/pe.mjs'")
   [IO.File]::WriteAllText($inspectFile, $inspect, (New-Object Text.UTF8Encoding($false)))
   Invoke-Checked 'node' @($inspectFile)
+  $appImports = & dumpbin.exe /DEPENDENTS (Join-Path $releaseDir 'tetro-dev.exe')
+  if ($LASTEXITCODE) { throw 'Could not inspect app runtime dependencies' }
+  if ($Target -eq 'aarch64-pc-windows-msvc' -and ($appImports -join "`n") -match '(?im)^\s*vcruntime140_1\.dll\s*$') { throw 'Native ARM64 app imports the excluded x64 runtime' }
+  [IO.File]::WriteAllText((Join-Path $recordDir 'app-runtime-imports.txt'),($appImports -join "`n"),(New-Object Text.UTF8Encoding($false)))
   $installers = @(Get-ChildItem (Join-Path $releaseDir 'bundle\nsis') -Filter '*.exe')
   if ($installers.Count -ne 1) { throw 'Expected exactly one Windows Dev NSIS installer' }
   Copy-Item $installers[0].FullName $recordDir
@@ -176,6 +196,7 @@ console.log('App, sidecars and ONNX DLLs all match $Target.');
     FfmpegSourceSHA256='6136812ea6d4e68bdba27e33c2a94382711cdf4f8602ffef056ff792bd6f9818'
     FfmpegEmbeddedPin=[ordered]@{Target=$env:TETRO_WINDOWS_FFMPEG_TARGET;SHA256=$env:TETRO_WINDOWS_FFMPEG_SHA256;Size=$env:TETRO_WINDOWS_FFMPEG_SIZE}
     MicrosoftRuntime=$runtimeRecords
+    ExcludedMicrosoftRuntime=$excludedRuntime
     CompilerExecutableSHA256=$mainRecord.CompilerSHA256
     BundledModels=@([ordered]@{Name='ggml-tiny.bin';ResourcePath='resources/models/ggml-tiny.bin';Size=$tinySpec.size;SHA256=$tinySpec.sha256})
     BuildHost=[Environment]::OSVersion.VersionString; Rust=((& rustc --version) -join ''); Node=((& node --version) -join '')
