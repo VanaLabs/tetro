@@ -11,6 +11,10 @@ on:
         description: Run only the native Whisper ABI check
         type: boolean
         default: false
+      consumer_candidate:
+        description: Also package and test the consumer identity internally (never publishes)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -82,6 +86,12 @@ jobs:
         if: '!inputs.binding_check_only'
         shell: pwsh
         run: ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage app
+      - name: Build and test internal consumer candidate
+        if: inputs.consumer_candidate && !inputs.binding_check_only
+        shell: pwsh
+        run: |
+          ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage app -Product candidate
+          ./frontend/scripts/windows/build-dev.ps1 -Target ${{ matrix.target }} -Stage tests -Product candidate
       - name: Retain internal installer and build evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -90,6 +100,14 @@ jobs:
           path: |
             target/windows-dev/${{ github.sha }}/${{ matrix.target }}/
             target/windows-dev/dependencies/ffmpeg/8.0.3/${{ matrix.target }}/config.log
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Retain internal consumer candidate
+        if: inputs.consumer_candidate && always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tetro-candidate-${{ matrix.target }}-${{ github.sha }}
+          path: target/windows-candidate/${{ github.sha }}/${{ matrix.target }}/
           if-no-files-found: warn
           retention-days: 30
       - name: Native Rust regression checks

@@ -1034,7 +1034,7 @@ button.tetro-stamp:hover { color:var(--tetro-accent); }
 .tetro-draft-note { padding: 0 24px; font-size: 11px; }
 .tetro-preview-section p, .tetro-preview-section li { font-size: 11px; line-height: 1.6; background: none; height: auto; width: auto; }
 .tetro-print-sheet { display: none; }
-  .tetro-print-sheet { font: 11pt/1.55 system-ui, sans-serif; color: #242322; }
+  .tetro-print-sheet { font: 11pt/1.55 system-ui, sans-serif; color: #242322; color-scheme: light; }
   .tetro-print-sheet article { max-width: none; }
   .tetro-print-brand { font-size: 13pt; letter-spacing: -.5pt; padding-bottom: 8pt; border-bottom: 1pt solid #cbc7bd; margin-bottom: 18pt; }
   .tetro-print-sheet h1 { font-size: 24pt; letter-spacing: -.6pt; margin: 0 0 8pt; line-height: 1.15; }

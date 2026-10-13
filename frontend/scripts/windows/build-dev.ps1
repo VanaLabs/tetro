@@ -3,6 +3,8 @@ param(
   [string]$Target = 'x86_64-pc-windows-msvc',
   [ValidateSet('all','bindings','ffmpeg','helper','app','tests')]
   [string]$Stage = 'all',
+  [ValidateSet('dev','candidate')]
+  [string]$Product = 'dev',
   [switch]$SkipTests
 )
 $ErrorActionPreference = 'Stop'
@@ -17,7 +19,12 @@ function Invoke-Checked([string]$Program, [string[]]$CallArguments) {
 }
 $source = (& git rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Build provenance requires the source Git commit' }
-$recordDir = Join-Path $root "target\windows-dev\$source\$Target"
+$isDev = $Product -eq 'dev'
+$outputRoot = if ($isDev) { 'windows-dev' } else { 'windows-candidate' }
+$productName = if ($isDev) { 'Tetro Dev' } else { 'Tetro' }
+$identifier = if ($isDev) { 'am.vanalabs.tetro.dev' } else { 'am.vanalabs.tetro' }
+$executable = if ($isDev) { 'tetro-dev.exe' } else { 'tetro.exe' }
+$recordDir = Join-Path $root "target\$outputRoot\$source\$Target"
 New-Item -ItemType Directory -Path $recordDir -Force | Out-Null
 $tinySpec = ([IO.File]::ReadAllText((Join-Path $root 'frontend\src-tauri\model-fingerprints.json')) | ConvertFrom-Json).'stt-whisper/ggml-tiny.bin'
 $tiny = Join-Path $root 'frontend\src-tauri\resources\models\ggml-tiny.bin'
@@ -163,13 +170,29 @@ if ($Stage -in @('all','helper')) {
   & (Join-Path $PSScriptRoot 'smoke-summary.ps1') -Helper (Join-Path $releaseDir 'llama-helper.exe') -Model $qwen -RuntimeDirectory $runtimeDir -Catalog $catalog -OutputFile (Join-Path $recordDir 'summary-model-smoke.json') -Target $Target
 }
 if ($Stage -in @('all','app')) {
-  Write-Host '::notice title=Windows Dev stage::Summary sidecar built; compiling and packaging Tetro Dev'
-  Invoke-Checked 'pnpm.cmd' @('--dir','frontend','exec','tauri','build','--config','src-tauri/tauri.dev.conf.json','--config','src-tauri/tauri.windows-dev.conf.json','--features','dev-profile','--target',$Target,'--bundles','nsis','--ci','--','--locked')
+  Write-Host "::notice title=Windows packaging::Compiling and packaging $productName ($Product)"
+  $appArguments = @('--dir','frontend','exec','tauri','build')
+  if ($isDev) {
+    $appArguments += @('--config','src-tauri/tauri.dev.conf.json','--config','src-tauri/tauri.windows-dev.conf.json','--features','dev-profile')
+  } else {
+    $appArguments += @('--config','src-tauri/tauri.windows-candidate.conf.json')
+  }
+  $appArguments += @('--target',$Target,'--bundles','nsis','--ci','--','--locked')
+  Invoke-Checked 'pnpm.cmd' $appArguments
+  if (!$isDev -and $Stage -eq 'app') {
+    # The optional candidate follows the Dev stages in the same native job.
+    # Retain their shared engine proofs alongside the consumer-specific payload.
+    $sharedRecords = Join-Path $root "target\windows-dev\$source\$Target"
+    foreach ($proof in @('whisper-abi-check.json','summary-model-smoke.json')) {
+      Copy-Item (Join-Path $sharedRecords $proof) $recordDir
+    }
+    Copy-Item (Join-Path $sharedRecords 'ffmpeg-smoke') $recordDir -Recurse -Force
+  }
   $inspect = @"
 import { assertWindowsMachine } from './frontend/scripts/windows/pe.mjs';
 import { existsSync, readdirSync } from 'node:fs';
-const app = '$($releaseDir.Replace('\','/'))/tetro-dev.exe';
-if (!existsSync(app)) throw new Error('Missing isolated Dev executable');
+const app = '$($releaseDir.Replace('\','/'))/$executable';
+if (!existsSync(app)) throw new Error('Missing $productName executable');
 for (const path of [app, '$($ffmpeg.Replace('\','/'))', '$($releaseDir.Replace('\','/'))/llama-helper.exe', 'frontend/src-tauri/binaries/onnxruntime/onnxruntime.dll', 'frontend/src-tauri/binaries/onnxruntime/onnxruntime_providers_shared.dll']) assertWindowsMachine(path, '$Target');
 for (const name of readdirSync('frontend/src-tauri/binaries/msvc-runtime')) assertWindowsMachine('frontend/src-tauri/binaries/msvc-runtime/' + name, '$Target');
 console.log('App, sidecars and ONNX DLLs all match $Target.');
@@ -179,20 +202,23 @@ console.log('App, sidecars and ONNX DLLs all match $Target.');
   $inspect = $inspect.Replace("'./frontend/scripts/windows/pe.mjs'", "'../../frontend/scripts/windows/pe.mjs'")
   [IO.File]::WriteAllText($inspectFile, $inspect, (New-Object Text.UTF8Encoding($false)))
   Invoke-Checked 'node' @($inspectFile)
-  $appImports = & dumpbin.exe /DEPENDENTS (Join-Path $releaseDir 'tetro-dev.exe')
+  $appImports = & dumpbin.exe /DEPENDENTS (Join-Path $releaseDir $executable)
   if ($LASTEXITCODE) { throw 'Could not inspect app runtime dependencies' }
   if ($Target -eq 'aarch64-pc-windows-msvc' -and ($appImports -join "`n") -match '(?im)^\s*vcruntime140_1\.dll\s*$') { throw 'Native ARM64 app imports the excluded x64 runtime' }
   [IO.File]::WriteAllText((Join-Path $recordDir 'app-runtime-imports.txt'),($appImports -join "`n"),(New-Object Text.UTF8Encoding($false)))
   $installers = @(Get-ChildItem (Join-Path $releaseDir 'bundle\nsis') -Filter '*.exe')
-  if ($installers.Count -ne 1) { throw 'Expected exactly one Windows Dev NSIS installer' }
+  $installers = @($installers | Where-Object { $_.Name.StartsWith("${productName}_",[StringComparison]::Ordinal) })
+  if ($installers.Count -ne 1) { throw "Expected exactly one $productName NSIS installer" }
   Copy-Item $installers[0].FullName $recordDir
   $mainRecordFile = Join-Path $recordDir 'main-executable.json'
-  Invoke-Checked 'node' @('frontend/scripts/windows/nsis-main-record.mjs',(Join-Path $releaseDir 'tetro-dev.exe'),$Target,$mainRecordFile)
+  Invoke-Checked 'node' @('frontend/scripts/windows/nsis-main-record.mjs',(Join-Path $releaseDir $executable),$Target,$mainRecordFile)
   $mainRecord = [IO.File]::ReadAllText($mainRecordFile) | ConvertFrom-Json
   $payloads = @($ffmpeg,(Join-Path $releaseDir 'llama-helper.exe'),(Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\onnxruntime.dll'),(Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\onnxruntime_providers_shared.dll'))
   $record = [ordered]@{
-    SourceCommit=$source; Target=$Target; Identity='am.vanalabs.tetro.dev'; Product='Tetro Dev'
-    WindowsMinimumBuild=22000; Updater='disabled'; Authenticode='unsigned internal Dev build'
+    SourceCommit=$source; Target=$Target; Identity=$identifier; Product=$productName
+    Version=([IO.File]::ReadAllText((Join-Path $root 'frontend\src-tauri\tauri.conf.json')) | ConvertFrom-Json).version
+    Distribution=$Product; Publication='not published'
+    WindowsMinimumBuild=22000; Updater=$(if ($isDev) { 'disabled' } else { 'consumer channel; unsigned candidate is not an update artifact' }); Authenticode=$(if ($isDev) { 'unsigned internal Dev build' } else { 'unsigned internal consumer candidate' })
     FfmpegSourceSHA256='6136812ea6d4e68bdba27e33c2a94382711cdf4f8602ffef056ff792bd6f9818'
     FfmpegEmbeddedPin=[ordered]@{Target=$env:TETRO_WINDOWS_FFMPEG_TARGET;SHA256=$env:TETRO_WINDOWS_FFMPEG_SHA256;Size=$env:TETRO_WINDOWS_FFMPEG_SIZE}
     MicrosoftRuntime=$runtimeRecords
@@ -217,6 +243,9 @@ if (!$SkipTests -and $Stage -in @('all','tests')) {
   Copy-Item (Join-Path $runtimeDir '*.dll') $testDir
   Copy-Item (Join-Path $root 'frontend\src-tauri\binaries\onnxruntime\*.dll') $testDir
   $env:ORT_DYLIB_PATH = Join-Path $testDir 'onnxruntime.dll'
-  Invoke-Checked 'cargo' @('test','--workspace','--locked','--release','--target',$Target,'--features','dev-profile','--','--test-threads=1','--nocapture','--skip','wake_fails_gracefully_for_unknown_device','--skip','test_list_system_audio_devices')
+  $testArguments = @('test','--workspace','--locked','--release','--target',$Target)
+  if ($isDev) { $testArguments += @('--features','dev-profile') }
+  $testArguments += @('--','--test-threads=1','--nocapture','--skip','wake_fails_gracefully_for_unknown_device','--skip','test_list_system_audio_devices')
+  Invoke-Checked 'cargo' $testArguments
 }
-Write-Host "Windows Dev artifacts and provenance: $recordDir"
+Write-Host "Windows $Product artifacts and provenance: $recordDir"
