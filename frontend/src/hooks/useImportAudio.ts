@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 
 import { applyPinnedSummaryLanguageToMeeting } from '@/lib/summary-language-preferences';
+import { importErrorMessage } from '@/lib/import-error';
 import { toast } from 'sonner';
 
 export interface AudioFileInfo {
@@ -134,8 +135,9 @@ export function useImportAudio({
           }
           isCancelledRef.current = false;
           setStatus('error');
-          setError(event.payload.error);
-          onErrorRef.current?.(event.payload.error);
+          const errorMessage = importErrorMessage(event.payload.error);
+          setError(errorMessage);
+          onErrorRef.current?.(errorMessage);
         }
       );
       if (cleanedUpRef.current) {
@@ -176,7 +178,7 @@ export function useImportAudio({
       }
     } catch (err: any) {
       setStatus('error');
-      const errorMsg = typeof err === 'string' ? err : (err?.message || String(err) || 'Failed to validate file');
+      const errorMsg = importErrorMessage(err, 'Could not validate this file. Please try again.');
       setError(errorMsg);
       onErrorRef.current?.(errorMsg);
       return null;
@@ -195,7 +197,7 @@ export function useImportAudio({
       return result;
     } catch (err: any) {
       setStatus('error');
-      const errorMsg = typeof err === 'string' ? err : (err?.message || String(err) || 'Failed to validate file');
+      const errorMsg = importErrorMessage(err, 'Could not validate this file. Please try again.');
       setError(errorMsg);
       onErrorRef.current?.(errorMsg);
       return null;
@@ -232,7 +234,7 @@ export function useImportAudio({
         });
       } catch (err: any) {
         setStatus('error');
-        const errorMsg = typeof err === 'string' ? err : (err?.message || String(err) || 'Failed to start import');
+        const errorMsg = importErrorMessage(err, 'Could not start the import. Please try again.');
         setError(errorMsg);
 
         onErrorRef.current?.(errorMsg);
