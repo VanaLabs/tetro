@@ -43,7 +43,9 @@ export function RecordingPostProcessingProvider({ children }: { children: React.
   }, []);
   useEffect(() => {
     if (!quitAfterSave.current) return;
-    if (recording.status === RecordingStatus.COMPLETED) {
+    // Saving sets COMPLETED and then IDLE in the same batch. The native quit
+    // command still rejects exit until the saved recording is acknowledged.
+    if (recording.status === RecordingStatus.COMPLETED || recording.status === RecordingStatus.IDLE) {
       quitAfterSave.current = false;
       void invoke('api_finish_quit').catch(e => { setQuitError(String(e)); setQuitting(false); });
     } else if (recording.status === RecordingStatus.ERROR) {
