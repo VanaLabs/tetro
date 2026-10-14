@@ -14,6 +14,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { SavedEdit, TEXT_UPDATED } from '@/lib/meeting-edits';
 import { wholeWord } from '@/lib/transcriptEdit';
 import { blockText, contentSignature } from '@/lib/summary-edit-state';
+import { prepareToggleCollapse } from '@/lib/editor-toggle-selection';
 import "@blocknote/shadcn/style.css";
 
 interface BlockNoteSummaryViewProps {
@@ -206,7 +207,7 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
   useImperativeHandle(ref, () => ({ saveSummary: save, cancelEdits: cancel, getMarkdown, isDirty }), [save, cancel, getMarkdown, isDirty]);
 
   if (!modern) return <AISummary summary={summaryData as Summary} status={status} error={error} onSummaryChange={onSummaryChange ?? (() => {})} onRegenerateSummary={onRegenerateSummary ?? (() => {})} meeting={meeting} />;
-  return <div ref={root} className="tetro-notes-editor w-full">
+  return <div ref={root} className="tetro-notes-editor w-full" onClickCapture={event => prepareToggleCollapse(event.target, editor)}>
     {earlierDraft && <div className="tetro-edit-state" role="status"><span>Unfinished edits from an earlier version are available.</span><button className="tetro-link" onClick={() => { editor.replaceBlocks(editor.document, earlierDraft); setEarlierDraft(null); changed(); }}>Open those edits</button><button className="tetro-link" onClick={() => { try { localStorage.removeItem(draftKey); } catch {} setEarlierDraft(null); }}>Discard draft</button></div>}
     <BlockNoteView editor={editor} onChange={changed} theme={theme} slashMenu={false} shadCNComponents={{ DropdownMenu: tetroEditorDropdown }}>
       <SuggestionMenuController triggerCharacter="/" suggestionMenuComponent={TetroSlashMenu} />
