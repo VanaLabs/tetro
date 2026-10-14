@@ -28,7 +28,7 @@ export function About() {
       <div className="tetro-about-identity"><h2 aria-label="Tetro"><TetroLiveBrand variant="about" /></h2><p>Vana Labs · {version ? `v${version}` : '…'}</p></div>
       <p className="tetro-about-description">Record conversations. Turn them into transcripts, summaries and action items.</p>
       <p className="tetro-about-note">Use local models or connect your own provider.</p>
-      <div className="tetro-dialog-actions tetro-about-actions"><button onClick={() => void invoke('open_external_url', { url: 'https://vanalabs.am' }).catch(e => toast.error(String(e)))}>Vana Labs</button><button onClick={() => setTab('licenses')}>Licenses</button><button disabled={isChecking} onClick={() => updateInfo?.available ? showUpdateDialog() : void checkForUpdates(true)}>{isChecking ? 'Checking…' : updateInfo?.available ? 'Update available' : 'Check for updates'}</button></div>
+      <div className="tetro-dialog-actions tetro-about-actions"><button onClick={() => void invoke('open_external_url', { url: 'https://vanalabs.co' }).catch(e => toast.error(String(e)))}>Vana Labs</button><button onClick={() => setTab('licenses')}>Licenses</button><button disabled={isChecking} onClick={() => updateInfo?.available ? showUpdateDialog() : void checkForUpdates(true)}>{isChecking ? 'Checking…' : updateInfo?.available ? 'Update available' : 'Check for updates'}</button></div>
     </> : tab === 'privacy' ? <dl className="tetro-privacy">{PRIVACY.map(([term, text]) => <div key={term}><dt>{term}</dt><dd>{text}</dd></div>)}</dl>
     : <div className="tetro-license-text"><pre>{licenses ? reflowLicenseText(licenses) : 'Loading notices…'}</pre></div>}</div>
   </div>;

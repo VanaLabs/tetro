@@ -253,6 +253,8 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 
 /* ——— Notes ——— */
 .tetro-summary-scroll { flex:1; overflow:auto; min-height:0; padding:0 16px 28px 8px; }
+/* Keep BlockNote's floating controls below app popovers without clipping editor menus. */
+.tetro-notes-editor { isolation:isolate; }
 .tetro-summary-scroll .bn-container { background:transparent!important; }
 .tetro-summary-scroll .bn-editor { background:transparent!important; color:var(--tetro-ink); font-family:var(--font-tetro),sans-serif; font-size:15.5px; line-height:1.6; padding:0 10px 20px 16px; max-width:76ch; }
 .tetro-summary-scroll .bn-block-content[data-content-type=heading] { font-family:var(--font-tetro),sans-serif; font-size:15.5px!important; font-weight:600; margin:12px 0 0; }

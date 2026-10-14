@@ -439,10 +439,11 @@ export function ParakeetModelManager({
         {confirmDialog}
         {[...(recommendedModel ? [recommendedModel] : []), ...otherModels].filter(m => (scope === 'recommended' ? m.name === recommendedId : scope === 'installed' ? m.status === 'Available' : scope === 'more' ? m.status !== 'Available' : true) && (!filterModel || filterModel(m.name))).map(model => {
           const info = getModelDisplayInfo(model.name);
+          const recommendation = info?.recommendation || (model.name === recommendedId ? 'Recommended' : undefined);
           const state = rowStateFromStatus(model.status, cancellingModels.has(model.name));
           return (
             <ModelRow key={model.name} name={info?.friendlyName || model.name} note={`Transcription · ${info?.tagline || model.description || ''}`}
-              badge={model.name === recommendedId ? <span className="tetro-recommended">Recommended</span> : undefined}
+              badge={recommendation ? <span className="tetro-recommended">{recommendation}</span> : undefined}
               sizeMb={model.size_mb} sizeLabel={formatFileSize(model.size_mb)} speed={model.speed} extra={info?.languages}
               inUse={selectedModel === model.name}
               state={state.kind === 'missing' && downloadingModels.has(model.name) ? { kind: 'downloading', progress: 0 } : state}
@@ -542,6 +543,7 @@ function ModelCard({
   const displayInfo = getModelDisplayInfo(model.name);
   const displayName = displayInfo?.friendlyName || model.name;
   const tagline = displayInfo?.tagline || model.description || '';
+  const recommendation = displayInfo?.recommendation || (isRecommended ? 'Recommended' : undefined);
 
   const isAvailable = model.status === 'Available';
   const isMissing = model.status === 'Missing';
@@ -582,7 +584,7 @@ function ModelCard({
             <div className="flex items-center gap-2 mb-1">
               <ReelGlyph sizeMb={model.size_mb} active={isSelected && isAvailable} />
               <h3 className="font-semibold text-gray-900">{displayName}</h3>
-              {isRecommended && <span className="tetro-recommended">Recommended</span>}
+              {recommendation && <span className="tetro-recommended">{recommendation}</span>}
               {isSelected && isAvailable && (
                 <motion.span
                   initial={{ scale: 0 }}

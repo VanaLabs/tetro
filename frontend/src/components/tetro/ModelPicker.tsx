@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { activateModel, activateNotesModel } from '@/lib/model-activation';
 import { loadModelSources, modelSources, modelLabel, type ModelChoice, type ModelPurpose, type SourceState } from '@/lib/model-choices';
+import { getModelDisplayInfo } from '@/lib/parakeet';
 import type { ModelConfig } from '@/components/ModelSettingsModal';
 
 type Props = {
@@ -85,9 +86,10 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
         {ordered.filter(s => s.options.length).map(s => <CommandGroup key={s.source.id} heading={s.source.label}>
           {s.options.map(o => {
             const selected = current.provider === o.provider && current.model === o.model;
+            const recommendation = o.provider === 'parakeet' ? getModelDisplayInfo(o.model)?.recommendation : undefined;
             return <CommandItem key={`${o.provider}:${o.model}`} value={`${s.source.label} ${o.label} ${o.model}`} disabled={saving} onSelect={() => void choose(o)}>
               <Check aria-hidden="true" className={`mr-2 h-4 w-4 shrink-0 ${selected ? '' : 'opacity-0'}`} />
-              <span className="min-w-0 flex-1"><span className="block truncate">{o.label}</span><small className="block text-muted-foreground">{o.detail}</small></span>
+              <span className="min-w-0 flex-1"><span className="block truncate">{o.label}</span>{recommendation && <span className="tetro-recommended">{recommendation}</span>}<small className="block text-muted-foreground">{o.detail}</small></span>
               {selected && <span className="tetro-choice-current">In use</span>}
             </CommandItem>;
           })}

@@ -52,6 +52,7 @@ export interface ModelDisplayInfo {
   /** Plain-language coverage, e.g. "25 languages" or "English" */
   languages: string;
   recommended?: boolean;
+  recommendation?: string;
   tier: 'fastest' | 'balanced' | 'precise';
 }
 
@@ -73,6 +74,7 @@ export const MODEL_DISPLAY_CONFIG: Record<string, ModelDisplayInfo> = {
     friendlyName: parakeetDisplayName('stt-fastconformer-armenian'),
     tagline: 'Real time. Armenian only, with punctuation.',
     languages: 'Armenian',
+    recommendation: 'Recommended for Armenian',
     tier: 'balanced'
   }
 };
