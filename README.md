@@ -17,11 +17,23 @@ reserved separately. See [BRAND.md](BRAND.md) before distributing a fork.
 
 ## Download
 
-[**Download Tetro 9.1.7 for Apple Silicon Macs**](https://github.com/VanaLabs/tetro/releases/download/v9.1.7/Tetro_9.1.7_aarch64.dmg)
+| Platform | Download |
+| --- | --- |
+| Windows 11, Intel or AMD | [Tetro 9.1.8 for Windows x64](https://github.com/VanaLabs/tetro/releases/download/v9.1.8/Tetro_9.1.8_x64-setup.exe) |
+| Windows 11, ARM processor | [Tetro 9.1.8 for Windows ARM64](https://github.com/VanaLabs/tetro/releases/download/v9.1.8/Tetro_9.1.8_arm64-setup.exe) |
+| Apple Silicon Mac | [Tetro 9.1.8 for macOS](https://github.com/VanaLabs/tetro/releases/download/v9.1.8/Tetro_9.1.8_aarch64.dmg) |
+
+## Install on Windows
+
+1. Choose **x64** for an Intel or AMD processor, or **ARM64** for an ARM processor. You can check **Settings → System → About → System type**.
+2. Download the matching `-setup.exe` and run it. Tetro installs for your Windows account.
+3. Open **Tetro** and complete setup to download your transcription and summary models.
+
+Windows 11 is required. The installers have signed updater packages but no Windows Authenticode publisher certificate, so Windows may show an unknown-publisher or SmartScreen notice. Use only the files from **VanaLabs/tetro**; their checksums are in `SHA256SUMS` on the release page. Do not disable Windows security globally.
 
 ## Install on your Mac
 
-1. Download **Tetro_9.1.7_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
+1. Download **Tetro_9.1.8_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
 2. Open the downloaded DMG, then **drag Tetro onto Applications** in that window. Wait for the copy to finish.
 3. Open **Finder → Applications → Tetro**. You can eject the Tetro disk image afterward.
 4. If macOS says Apple cannot check Tetro or the developer cannot be verified, dismiss that message with **Done** (or **OK**, depending on macOS). Keep the app in Applications.
@@ -39,8 +51,8 @@ Tetro is ad-hoc signed and not Apple-notarized. These steps apply to the unident
 This installer is for **Apple Silicon Macs**. Computer-audio capture requires macOS 14.4 or later.
 
 Onboarding helps you set up permissions and download Parakeet for transcription
-and Qwen 3.5 2B for summaries. Intel Mac, Windows, and Linux installers are not
-included in this release.
+and Qwen 3.5 2B for summaries. This release includes Windows x64, Windows ARM64
+and Apple Silicon macOS installers. Intel Mac and Linux installers are not included.
 
 ## Source layout
 
