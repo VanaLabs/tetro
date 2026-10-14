@@ -32,7 +32,7 @@ export default function HelpPage() {
       <details><summary>A model is slow or won’t download?</summary><p>Keep Tetro open while a download runs, and check your internet connection and free space. Retry a failed download from Models. For slow transcription or summaries, stop the job and try a smaller installed model. Running a model needs more memory than its download size.</p></details>
       <details><summary>A connected provider isn’t working?</summary><p>Check its API key, account balance and model availability in Settings → Models. A custom server also needs the correct address and model name. Built-in models can be used without a provider account after downloading them.</p></details>
       <details><summary>What is sent off my device?</summary><p>Built-in speech and summary models process your meeting here. Connected providers receive the text needed for summaries, automatic names, template drafting and speaker labels when those features use that provider. See About → Privacy for details.</p></details>
-      <details><summary>Keyboard shortcuts</summary><p>New recording: Command/Ctrl + N. Import: Command/Ctrl + O. Settings: Command/Ctrl + comma. Show or hide the meeting list: Command/Ctrl + backslash. Change background recording shortcuts in Settings → Recordings. The Help menu also lists shortcuts.</p></details>
+      <details><summary>Keyboard shortcuts</summary><p>New recording: Command/Ctrl + N. Import: Command/Ctrl + O. Settings: Command/Ctrl + comma. Show or hide the meeting list: Command/Ctrl + backslash. Change background recording shortcuts in Settings → Recordings.</p></details>
     </div>
   </div>;
 }
