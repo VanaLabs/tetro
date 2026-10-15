@@ -1,11 +1,15 @@
 export const ARMENIAN_WHISPER_MODEL = 'large-v3-turbo-hy';
 // Armenian fine-tune of Whisper large-v3-turbo; also keeps English and Russian words.
-export const ARMENIAN_WHISPER_SIZE_MB = 1549;
 // Armenian-tuned Whisper models, best first. The first one that's installed is used.
 export const ARMENIAN_WHISPER_MODELS = [ARMENIAN_WHISPER_MODEL];
 export const isArmenianWhisperModel = (name: string) => ARMENIAN_WHISPER_MODELS.includes(name) || /-hy(-|$)/.test(name);
 export const DEFAULT_PARAKEET_MODEL = 'stt-parakeet-multilingual';
 export const ARMENIAN_PARAKEET_MODEL = 'stt-fastconformer-armenian';
+export const ARMENIAN_PARAKEET_SIZE_MB = 137;
+
+// Multilingual Whisper models can also transcribe Armenian; English-only variants cannot.
+export const whisperSupportsArmenian = (name: string) => isArmenianWhisperModel(name)
+  || /^(tiny|base|small|medium|large-v[123])(?:-turbo)?(?:-q\d_\d)?$/.test(name);
 
 const PARAKEET_VISIBLE_LANGUAGE_CODES = new Set([
   'auto',
@@ -21,7 +25,7 @@ export type TranscriptionRoute =
       kind: 'switch';
       provider: 'localWhisper' | 'parakeet';
       model: string;
-      requiresWhisperModel: boolean;
+      requiresParakeetModel: boolean;
     };
 
 export interface TranscriptConfig {
@@ -30,7 +34,7 @@ export interface TranscriptConfig {
   apiKey?: string | null;
 }
 
-export interface WhisperModel {
+export interface TranscriptionModel {
   name: string;
   status: unknown;
 }
@@ -38,7 +42,9 @@ export interface WhisperModel {
 export interface ApplyLanguageSelectionOptions {
   languageCode: string;
   currentConfig: TranscriptConfig;
-  listWhisperModels: () => Promise<WhisperModel[]>;
+  listParakeetModels: () => Promise<TranscriptionModel[]>;
+  listWhisperModels: () => Promise<TranscriptionModel[]>;
+  useRecommendedArmenianModel?: boolean;
   saveTranscriptConfig: (config: TranscriptConfig) => Promise<void>;
   saveLanguage: (languageCode: string) => Promise<void>;
 }
@@ -53,20 +59,21 @@ export type ApplyLanguageSelectionResult =
   | {
       status: 'applied';
       config: TranscriptConfig;
+      armenianRecommendation?: { available: boolean };
     }
   | {
       status: 'download-required';
-      model: typeof ARMENIAN_WHISPER_MODEL;
-      sizeMb: typeof ARMENIAN_WHISPER_SIZE_MB;
+      model: typeof ARMENIAN_PARAKEET_MODEL;
+      sizeMb: typeof ARMENIAN_PARAKEET_SIZE_MB;
     };
 
 export function resolveTranscriptionRoute(languageCode: string): TranscriptionRoute {
   if (languageCode === 'hy') {
     return {
       kind: 'switch',
-      provider: 'localWhisper',
-      model: ARMENIAN_WHISPER_MODEL,
-      requiresWhisperModel: true,
+      provider: 'parakeet',
+      model: ARMENIAN_PARAKEET_MODEL,
+      requiresParakeetModel: true,
     };
   }
 
@@ -75,7 +82,7 @@ export function resolveTranscriptionRoute(languageCode: string): TranscriptionRo
       kind: 'switch',
       provider: 'parakeet',
       model: DEFAULT_PARAKEET_MODEL,
-      requiresWhisperModel: false,
+      requiresParakeetModel: false,
     };
   }
 
@@ -100,43 +107,45 @@ export function isPrimaryLanguageSelectionAvailable(provider: string): boolean {
 export async function applyTranscriptionLanguageSelection({
   languageCode,
   currentConfig,
+  listParakeetModels,
   listWhisperModels,
+  useRecommendedArmenianModel = false,
   saveTranscriptConfig,
   saveLanguage,
 }: ApplyLanguageSelectionOptions): Promise<ApplyLanguageSelectionResult> {
-  // Keep the NVIDIA Armenian model when it's already chosen instead of switching to Whisper.
-  const route: TranscriptionRoute =
-    languageCode === 'hy' && currentConfig.provider === 'parakeet' && currentConfig.model === ARMENIAN_PARAKEET_MODEL
-      ? { kind: 'keep-current' }
-      : languageCode === 'auto' && currentConfig.provider === 'parakeet'
-        ? { kind: 'switch', provider: 'parakeet', model: DEFAULT_PARAKEET_MODEL, requiresWhisperModel: false }
-        : resolveTranscriptionRoute(languageCode);
-  let chosenModel: string | undefined;
+  let route: TranscriptionRoute = languageCode === 'auto' && currentConfig.provider === 'parakeet'
+    ? { kind: 'switch', provider: 'parakeet', model: DEFAULT_PARAKEET_MODEL, requiresParakeetModel: false }
+    : resolveTranscriptionRoute(languageCode);
+  let armenianRecommendation: { available: boolean } | undefined;
+
+  if (route.kind === 'switch' && route.requiresParakeetModel) {
+    const [parakeet, whisper] = await Promise.all([listParakeetModels(), listWhisperModels()]);
+    const nvidiaAvailable = parakeet.some(model => model.name === ARMENIAN_PARAKEET_MODEL && model.status === 'Available');
+    const compatibleWhisper = whisper.filter(model => model.status === 'Available' && whisperSupportsArmenian(model.name));
+    const currentWhisper = currentConfig.provider === 'localWhisper'
+      ? compatibleWhisper.find(model => model.name === currentConfig.model) : undefined;
+    const fallback = currentWhisper
+      ?? compatibleWhisper.find(model => isArmenianWhisperModel(model.name))
+      ?? compatibleWhisper.find(model => model.name.startsWith('large-'))
+      ?? compatibleWhisper[0];
+
+    if (!useRecommendedArmenianModel && fallback && (currentWhisper || !nvidiaAvailable)) {
+      route = currentWhisper ? { kind: 'keep-current' }
+        : { kind: 'switch', provider: 'localWhisper', model: fallback.name, requiresParakeetModel: false };
+      armenianRecommendation = { available: nvidiaAvailable };
+    } else if (!nvidiaAvailable) {
+      return { status: 'download-required', model: ARMENIAN_PARAKEET_MODEL, sizeMb: ARMENIAN_PARAKEET_SIZE_MB };
+    }
+  }
 
   if (route.kind === 'keep-current') {
     await saveLanguage(languageCode);
-    return { status: 'applied', config: currentConfig };
-  }
-
-  if (route.requiresWhisperModel) {
-    const models = await listWhisperModels();
-    const installed = new Set(models.filter((model) => model.status === 'Available').map((model) => model.name));
-    const candidates = languageCode === 'hy' ? ARMENIAN_WHISPER_MODELS : [route.model];
-    const model = candidates.find((name) => installed.has(name));
-
-    chosenModel = model;
-    if (!model) {
-      return {
-        status: 'download-required',
-        model: ARMENIAN_WHISPER_MODEL,
-        sizeMb: ARMENIAN_WHISPER_SIZE_MB,
-      };
-    }
+    return { status: 'applied', config: currentConfig, armenianRecommendation };
   }
 
   const nextConfig: TranscriptConfig = {
     provider: route.provider,
-    model: route.requiresWhisperModel ? chosenModel ?? route.model : route.model,
+    model: route.model,
     apiKey: null,
   };
 
@@ -149,7 +158,7 @@ export async function applyTranscriptionLanguageSelection({
     throw error;
   }
 
-  return { status: 'applied', config: nextConfig };
+  return { status: 'applied', config: nextConfig, armenianRecommendation };
 }
 
 export async function persistLanguagePreference(

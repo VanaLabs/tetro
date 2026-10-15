@@ -1,15 +1,23 @@
 import React from 'react';
 import { expect, test, mock } from 'bun:test';
 import { act, create } from 'react-test-renderer';
-import { recordingLanguageLabel } from '../../src/lib/recording-setup';
+import { recordingLanguageCode, recordingLanguageLabel } from '../../src/lib/recording-setup';
 import { RecordingReady } from '../../src/components/tetro/RecordingReady';
 
 test('fixed-language engines show their actual language even with an old global preference', () => {
   expect(recordingLanguageLabel('parakeet', 'stt-fastconformer-armenian', 'en')).toBe('Armenian');
   expect(recordingLanguageLabel('parakeet', 'stt-parakeet-english', 'hy')).toBe('English');
-  expect(recordingLanguageLabel('parakeet', 'stt-parakeet-multilingual', 'hy')).toBe('Detect automatically');
+  expect(recordingLanguageLabel('parakeet', 'armenian-fastconformer-hy-int8', 'auto')).toBe('Armenian');
   expect(recordingLanguageLabel('localWhisper', 'base', 'en')).toBe('English');
   expect(recordingLanguageLabel('localWhisper', 'base', 'auto-translate')).toContain('write transcript in English');
+});
+
+test('multilingual model shows the saved language consistently with the picker', () => {
+  for (const [code, label] of [['en', 'English'], ['ru', 'Russian'], ['hy', 'Armenian'], ['auto', 'Detect automatically']]) {
+    expect(recordingLanguageCode('parakeet', 'stt-parakeet-multilingual', code)).toBe(code);
+    expect(recordingLanguageLabel('parakeet', 'stt-parakeet-multilingual', code)).toBe(label);
+  }
+  expect(recordingLanguageLabel('localWhisper', 'base', 'unknown')).toBe('Detect automatically');
 });
 
 test('setup choices open their pickers and lock while recording starts', () => {

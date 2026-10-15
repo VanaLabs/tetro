@@ -1,8 +1,8 @@
 'use client';
 import { LanguageChooser } from '@/components/tetro/LanguageChooser';
 import React, { useState } from 'react';
-import { canonicalModelName } from '@/lib/parakeet';
-import { Globe } from 'lucide-react';
+import { ParakeetAPI } from '@/lib/parakeet';
+import { recordingLanguageCode } from '@/lib/recording-setup';
 import { listen } from '@tauri-apps/api/event';
 
 import { toast } from 'sonner';
@@ -13,8 +13,8 @@ import { WhisperAPI } from '@/lib/whisper';
 import { TranscriptModelProps } from '@/components/TranscriptSettings';
 import {
   applyTranscriptionLanguageSelection,
-  ARMENIAN_WHISPER_MODEL,
-  ARMENIAN_WHISPER_SIZE_MB,
+  ARMENIAN_PARAKEET_MODEL,
+  ARMENIAN_PARAKEET_SIZE_MB,
   languagesForTranscriptionProvider,
   TranscriptConfig,
 } from '@/lib/transcription-language-routing';
@@ -36,7 +36,7 @@ export function LanguageSelection({
   provider = 'localWhisper',
 }: LanguageSelectionProps) {
   const [saving, setSaving] = useState(false);
-  const [pendingArmenianDownload, setPendingArmenianDownload] = useState(false);
+  const [pendingArmenianDownload, setPendingArmenianDownload] = useState<{ optional: boolean; available: boolean } | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -46,18 +46,17 @@ export function LanguageSelection({
     setSelectedLanguage,
   } = useConfig();
 
-  const isParakeet = provider === 'parakeet';
-  const modelId = canonicalModelName(transcriptModelConfig.model);
-  const displayedLanguage = isParakeet && modelId === 'stt-fastconformer-armenian' ? 'hy'
-    : isParakeet && modelId === 'stt-parakeet-english' ? 'en' : selectedLanguage;
+  const displayedLanguage = recordingLanguageCode(provider, transcriptModelConfig.model, selectedLanguage);
   const availableLanguages = languagesForTranscriptionProvider(LANGUAGES, provider);
   const controlsDisabled = disabled || saving || downloading;
 
-  const applyLanguageSelection = async (languageCode: string) => {
+  const applyLanguageSelection = async (languageCode: string, useRecommendedArmenianModel = false) => {
     return applyTranscriptionLanguageSelection({
       languageCode,
       currentConfig: transcriptModelConfig,
+      listParakeetModels: () => ParakeetAPI.getAvailableModels(),
       listWhisperModels: () => WhisperAPI.getAvailableModels(),
+      useRecommendedArmenianModel,
       saveTranscriptConfig: async (config: TranscriptConfig) => {
         const nextConfig = config as TranscriptModelProps;
         await configService.saveTranscriptConfig(nextConfig);
@@ -76,12 +75,13 @@ export function LanguageSelection({
     try {
       const result = await applyLanguageSelection(languageCode);
       if (result.status === 'download-required') {
-        setPendingArmenianDownload(true);
+        setPendingArmenianDownload({ optional: false, available: false });
         setDownloadProgress(0);
         return;
       }
 
-      setPendingArmenianDownload(false);
+      setPendingArmenianDownload(result.armenianRecommendation
+        ? { optional: true, available: result.armenianRecommendation.available } : null);
     } catch (error) {
       console.error('Failed to save language preference:', error);
       toast.error('Failed to save language preference', {
@@ -101,29 +101,31 @@ export function LanguageSelection({
     let unlistenProgress: (() => void) | undefined;
 
     try {
-      unlistenProgress = await listen<ModelDownloadProgress>(
-        'model-download-progress',
-        (event) => {
-          if (event.payload.modelName === ARMENIAN_WHISPER_MODEL) {
-            setDownloadProgress(Math.round(event.payload.progress));
-          }
-        },
-      );
+      if (!pendingArmenianDownload?.available) {
+        unlistenProgress = await listen<ModelDownloadProgress>(
+          'parakeet-model-download-progress',
+          (event) => {
+            if (event.payload.modelName === ARMENIAN_PARAKEET_MODEL) {
+              setDownloadProgress(Math.round(event.payload.progress));
+            }
+          },
+        );
 
-      await WhisperAPI.init();
-      await WhisperAPI.downloadModel(ARMENIAN_WHISPER_MODEL);
-
-      const result = await applyLanguageSelection('hy');
-      if (result.status !== 'applied') {
-        throw new Error('Whisper large-v3 downloaded but is not available yet');
+        await ParakeetAPI.init();
+        await ParakeetAPI.downloadModel(ARMENIAN_PARAKEET_MODEL);
       }
 
-      setPendingArmenianDownload(false);
+      const result = await applyLanguageSelection('hy', true);
+      if (result.status !== 'applied') {
+        throw new Error('Armenian NVIDIA FastConformer downloaded but is not available yet');
+      }
+
+      setPendingArmenianDownload(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('Failed to download the Armenian transcription model:', error);
       setDownloadError(message);
-      toast.error('Whisper large-v3 download failed', {
+      toast.error('Armenian model download failed', {
         description: message,
       });
     } finally {
@@ -134,14 +136,10 @@ export function LanguageSelection({
 
   const handleCancelArmenianDownload = () => {
     if (controlsDisabled) return;
-    setPendingArmenianDownload(false);
+    setPendingArmenianDownload(null);
     setDownloadProgress(0);
     setDownloadError(null);
   };
-
-  const selectedLanguageName = LANGUAGES.find(
-    (language) => language.code === displayedLanguage,
-  )?.name || 'Auto Detect (Original Language)';
 
   return (
     <div className="space-y-4">
@@ -150,12 +148,16 @@ export function LanguageSelection({
         <p className="text-xs text-muted-foreground">This controls speech recognition. Summaries have their own language choice.</p>
 
         {pendingArmenianDownload && (
-          <div className="space-y-3 rounded border border-blue-200 bg-blue-50 p-3 text-blue-900">
+          <div className={`space-y-3 rounded border p-3 ${pendingArmenianDownload.optional
+            ? 'border-border bg-muted/30 text-foreground'
+            : 'border-blue-200 bg-blue-50 text-blue-900'}`}>
             <div>
-              <p className="text-sm font-medium">Whisper large-v3 is required for Armenian</p>
+              <p className="text-sm font-medium">{pendingArmenianDownload.optional ? 'Recommended for Armenian' : 'Download an Armenian model'}</p>
               <p className="mt-1 text-xs">
-                Download the {ARMENIAN_WHISPER_SIZE_MB.toLocaleString()} MB local model.
-                Your current language and transcriber will stay unchanged until it is ready.
+                Armenian · NVIDIA FastConformer · INT8 is a {ARMENIAN_PARAKEET_SIZE_MB.toLocaleString()} MB local model.{' '}
+                {pendingArmenianDownload.optional
+                  ? 'Optional — you can keep using your current Whisper model.'
+                  : 'Your current language and model will stay unchanged until it is ready.'}
               </p>
             </div>
 
@@ -184,7 +186,7 @@ export function LanguageSelection({
                 disabled={controlsDisabled}
                 className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 disabled:opacity-50"
               >
-                Cancel
+                {pendingArmenianDownload.optional ? 'Keep current model' : 'Cancel'}
               </button>
               <button
                 type="button"
@@ -192,20 +194,9 @@ export function LanguageSelection({
                 disabled={controlsDisabled}
                 className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
               >
-                {downloading ? 'Downloading…' : downloadError ? 'Retry download' : 'Download'}
+                {downloading ? 'Preparing…' : pendingArmenianDownload.available ? 'Use NVIDIA model' : downloadError ? 'Retry download' : 'Download'}
               </button>
             </div>
-          </div>
-        )}
-
-        {isParakeet && (
-          <div className="rounded border border-amber-200 bg-amber-50 p-2 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-            <p className="font-medium">Automatic model switching</p>
-            <p className="mt-1 text-xs">
-              {modelId === 'stt-fastconformer-armenian' ? 'This model hears Armenian only. Choose English, Russian, or automatic detection above to switch models.'
-                : modelId === 'stt-parakeet-english' ? 'This model hears English only. Choose automatic detection for more languages.'
-                  : 'This model detects the spoken language automatically. Choose Armenian above to switch to an Armenian model.'}
-            </p>
           </div>
         )}
 

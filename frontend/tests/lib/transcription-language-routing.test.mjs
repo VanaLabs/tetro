@@ -44,12 +44,12 @@ test('the shared transcription catalog contains Armenian', () => {
   );
 });
 
-test('Armenian routes to the installed Whisper model', () => {
+test('Armenian recommends NVIDIA FastConformer', () => {
   assertJsonEqual(routing.resolveTranscriptionRoute('hy'), {
     kind: 'switch',
-    provider: 'localWhisper',
-    model: 'large-v3-turbo-hy',
-    requiresWhisperModel: true,
+    provider: 'parakeet',
+    model: 'stt-fastconformer-armenian',
+    requiresParakeetModel: true,
   });
 });
 
@@ -59,7 +59,7 @@ test('English and Russian route to Parakeet', () => {
       kind: 'switch',
       provider: 'parakeet',
       model: 'stt-parakeet-multilingual',
-      requiresWhisperModel: false,
+      requiresParakeetModel: false,
     });
   }
 });
@@ -90,34 +90,38 @@ test('available Armenian model is saved before the language preference', async (
       model: 'stt-parakeet-multilingual',
       apiKey: null,
     },
-    listWhisperModels: async () => [{ name: 'large-v3-turbo-hy', status: 'Available' }],
+    listWhisperModels: async () => [],
+    listParakeetModels: async () => [{ name: 'stt-fastconformer-armenian', status: 'Available' }],
     saveTranscriptConfig: async (config) => calls.push(['config', config]),
     saveLanguage: async (languageCode) => calls.push(['language', languageCode]),
   });
 
   assert.equal(result.status, 'applied');
   assertJsonEqual(calls, [
-    ['config', { provider: 'localWhisper', model: 'large-v3-turbo-hy', apiKey: null }],
+    ['config', { provider: 'parakeet', model: 'stt-fastconformer-armenian', apiKey: null }],
     ['language', 'hy'],
   ]);
 });
 
-test('missing Armenian model does not change settings', async () => {
-  const calls = [];
-  const result = await routing.applyTranscriptionLanguageSelection({
-    languageCode: 'hy',
-    currentConfig: { provider: 'parakeet', model: 'stt-parakeet-multilingual', apiKey: null },
-    listWhisperModels: async () => [{ name: 'large-v3-turbo-hy', status: 'Missing' }],
-    saveTranscriptConfig: async (config) => calls.push(config),
-    saveLanguage: async (languageCode) => calls.push(languageCode),
-  });
+test('missing or incomplete Armenian NVIDIA model offers its 137 MB download without changing settings', async () => {
+  for (const status of ['Missing', { Downloading: { progress: 50 } }, { Error: 'failed' }, { Corrupted: {} }]) {
+    const calls = [];
+    const result = await routing.applyTranscriptionLanguageSelection({
+      languageCode: 'hy',
+      currentConfig: { provider: 'parakeet', model: 'stt-parakeet-multilingual', apiKey: null },
+      listWhisperModels: async () => [],
+      listParakeetModels: async () => [{ name: 'stt-fastconformer-armenian', status }],
+      saveTranscriptConfig: async (config) => calls.push(config),
+      saveLanguage: async (languageCode) => calls.push(languageCode),
+    });
 
-  assertJsonEqual(result, {
-    status: 'download-required',
-    model: 'large-v3-turbo-hy',
-    sizeMb: 1549,
-  });
-  assertJsonEqual(calls, []);
+    assertJsonEqual(result, {
+      status: 'download-required',
+      model: 'stt-fastconformer-armenian',
+      sizeMb: 137,
+    });
+    assertJsonEqual(calls, []);
+  }
 });
 
 test('failed language synchronization restores the prior stored value', async () => {
@@ -134,20 +138,94 @@ test('failed language synchronization restores the prior stored value', async ()
   assert.equal(storedLanguage, 'en');
 });
 
-test('Armenian ignores the plain Large V3 model', async () => {
+test('an unavailable Whisper configuration cannot bypass the NVIDIA download offer', async () => {
   const calls = [];
-  await routing.applyTranscriptionLanguageSelection({
+  const result = await routing.applyTranscriptionLanguageSelection({
     languageCode: 'hy',
-    currentConfig: { provider: 'parakeet', model: 'stt-parakeet-multilingual' },
-    listWhisperModels: async () => [
-      { name: 'large-v3', status: 'Available' },
-      { name: 'small-hy', status: 'Available' },
-      { name: 'large-v3-turbo-hy', status: 'Available' },
-    ],
+    currentConfig: { provider: 'localWhisper', model: 'large-v3' },
+    listWhisperModels: async () => [],
+    listParakeetModels: async () => [],
     saveTranscriptConfig: async (config) => calls.push(config.model),
     saveLanguage: async () => {},
   });
-  assertJsonEqual(calls, ['large-v3-turbo-hy']);
+  assert.equal(result.status, 'download-required');
+  assert.equal(result.model, 'stt-fastconformer-armenian');
+  assertJsonEqual(calls, []);
+});
+
+test('installed large Whisper remains selected and gets an optional NVIDIA recommendation', async () => {
+  const writes = [];
+  const currentConfig = { provider: 'localWhisper', model: 'large-v3' };
+  const result = await routing.applyTranscriptionLanguageSelection({
+    languageCode: 'hy', currentConfig,
+    listWhisperModels: async () => [{ name: 'large-v3', status: 'Available' }],
+    listParakeetModels: async () => [],
+    saveTranscriptConfig: async config => writes.push(config),
+    saveLanguage: async language => writes.push(language),
+  });
+  assert.equal(result.status, 'applied');
+  assert.equal(result.config, currentConfig);
+  assertJsonEqual(result.armenianRecommendation, { available: false });
+  assertJsonEqual(writes, ['hy']);
+});
+
+test('installed large Whisper is usable from Parakeet when NVIDIA is absent', async () => {
+  const writes = [];
+  const result = await routing.applyTranscriptionLanguageSelection({
+    languageCode: 'hy', currentConfig: { provider: 'parakeet', model: routing.DEFAULT_PARAKEET_MODEL },
+    listWhisperModels: async () => [{ name: 'large-v3-turbo-q5_0', status: 'Available' }],
+    listParakeetModels: async () => [],
+    saveTranscriptConfig: async config => writes.push(config),
+    saveLanguage: async language => writes.push(language),
+  });
+  assert.equal(result.status, 'applied');
+  assert.equal(result.config.model, 'large-v3-turbo-q5_0');
+  assertJsonEqual(result.armenianRecommendation, { available: false });
+  assert.equal(writes[1], 'hy');
+});
+
+test('English-only and incomplete Whisper models cannot be used for Armenian', async () => {
+  const result = await routing.applyTranscriptionLanguageSelection({
+    languageCode: 'hy', currentConfig: { provider: 'parakeet', model: routing.DEFAULT_PARAKEET_MODEL },
+    listWhisperModels: async () => [
+      { name: 'base.en', status: 'Available' },
+      { name: 'large-v3', status: 'Missing' },
+      { name: 'large-v3-turbo-hy', status: { Downloading: { progress: 90 } } },
+    ],
+    listParakeetModels: async () => [],
+    saveTranscriptConfig: async () => { throw new Error('should not save'); },
+    saveLanguage: async () => { throw new Error('should not save'); },
+  });
+  assert.equal(result.status, 'download-required');
+  assert.equal(result.model, routing.ARMENIAN_PARAKEET_MODEL);
+});
+
+test('explicit Armenian Whisper choice is preserved', async () => {
+  const calls = [];
+  const currentConfig = { provider: 'localWhisper', model: 'large-v3-turbo-hy' };
+  const result = await routing.applyTranscriptionLanguageSelection({
+    languageCode: 'hy', currentConfig,
+    listWhisperModels: async () => [{ name: currentConfig.model, status: 'Available' }],
+    listParakeetModels: async () => [],
+    saveTranscriptConfig: async () => { throw new Error('should not switch'); },
+    saveLanguage: async language => calls.push(language),
+  });
+  assert.equal(result.config, currentConfig);
+  assertJsonEqual(calls, ['hy']);
+});
+
+test('failed language save rolls back the model selection', async () => {
+  const writes = [];
+  const currentConfig = { provider: 'parakeet', model: 'stt-parakeet-multilingual' };
+  await assert.rejects(routing.applyTranscriptionLanguageSelection({
+    languageCode: 'hy', currentConfig,
+    listWhisperModels: async () => [],
+    listParakeetModels: async () => [{ name: 'stt-fastconformer-armenian', status: 'Available' }],
+    saveTranscriptConfig: async config => writes.push(config),
+    saveLanguage: async () => { throw new Error('save failed'); },
+  }), /save failed/);
+  assert.equal(writes[0].model, 'stt-fastconformer-armenian');
+  assert.equal(writes[1], currentConfig);
 });
 
 test('automatic detection switches away from a fixed Armenian model', async () => {
@@ -156,6 +234,7 @@ test('automatic detection switches away from a fixed Armenian model', async () =
     languageCode: 'auto',
     currentConfig: { provider: 'parakeet', model: routing.ARMENIAN_PARAKEET_MODEL },
     listWhisperModels: async () => [],
+    listParakeetModels: async () => [],
     saveTranscriptConfig: async value => writes.push(value),
     saveLanguage: async value => writes.push(value),
   });

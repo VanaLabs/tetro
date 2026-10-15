@@ -1,6 +1,6 @@
 {
     "name": "tetro",
-    "version": "9.1.9",
+    "version": "9.1.10",
     "private": true,
     "scripts": {
         "dev": "next dev -p 3118",
