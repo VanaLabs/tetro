@@ -1,6 +1,7 @@
 import React from 'react';
 import { afterEach, expect, mock, test } from 'bun:test';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+mock.module('next/navigation', () => ({ useRouter: () => ({ push: () => {} }) }));
 
 type Registration = { resolve: (off: () => void) => void; off: ReturnType<typeof mock>; callback: (event: unknown) => void };
 let registrations: Registration[] = [];

@@ -126,9 +126,9 @@ export function ModelsSettings({ section, onSectionChange, browseSummaryOnOpen =
     </div>}
     {section === 'external' && <div className="tetro-model-section" aria-labelledby="tetro-model-external-heading">
       <h2 id="tetro-model-external-heading">External models</h2>
-      <p>Connect a provider or server for summaries.</p>
+      <p>The provider you connect processes your text for summaries.</p>
+      <SettingGroup title="Your own server"><CustomServer /><OllamaModels /></SettingGroup>
       <SettingGroup title="Providers"><ProviderKeys /></SettingGroup>
-      <SettingGroup title="Your own server"><OllamaModels /><CustomServer /></SettingGroup>
       <p className="tetro-setting-note">Keys are stored on this device and sent to the provider to authenticate requests. Using a connected summary model sends transcript text and instructions to that provider, including for automatic meeting names and speaker labels.</p>
     </div>}
   </div>;

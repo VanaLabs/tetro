@@ -10,6 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { activateModel, activateNotesModel } from '@/lib/model-activation';
 import { loadModelSources, modelSources, modelLabel, type ModelChoice, type ModelPurpose, type SourceState } from '@/lib/model-choices';
 import { getModelDisplayInfo } from '@/lib/parakeet';
+import { openTranscriptionModelDownloads } from '@/lib/model-settings-route';
 import type { ModelConfig } from '@/components/ModelSettingsModal';
 
 type Props = {
@@ -62,10 +63,10 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
   const getMore = () => {
     setOpen(false);
     if (onGetMore) onGetMore();
+    else if (purpose === 'transcription') openTranscriptionModelDownloads(router.push);
     else {
       sessionStorage.setItem('tetro.settingsTab', 'models');
-      sessionStorage.setItem('tetro.modelsSection', purpose === 'transcription' ? 'transcription' : ['openai', 'claude', 'groq', 'openrouter', 'ollama', 'custom-openai'].includes(current.provider) ? 'external' : 'summary');
-      if (purpose === 'transcription') sessionStorage.setItem('tetro.browseTranscriptionModels', '1');
+      sessionStorage.setItem('tetro.modelsSection', ['openai', 'claude', 'groq', 'openrouter', 'ollama', 'custom-openai'].includes(current.provider) ? 'external' : 'summary');
       if (purpose === 'notes') sessionStorage.setItem('tetro.browseSummaryModels', '1');
       router.push('/settings');
     }
@@ -81,7 +82,7 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
     {message && <p className="tetro-chooser-message">{message}</p>}
     <Command>
       <CommandInput placeholder="Search models…" aria-label={`Search ${title.toLowerCase()}s`} />
-      <CommandList className="max-h-[310px]" aria-label={title}>
+      <CommandList className="max-h-[310px]" aria-label={title} aria-busy={loading}>
         <CommandEmpty>{loading && !hasChoices ? 'Looking for installed models…' : 'No matching models. Download more models below.'}</CommandEmpty>
         {ordered.filter(s => s.options.length).map(s => <CommandGroup key={s.source.id} heading={s.source.label}>
           {s.options.map(o => {
@@ -98,7 +99,6 @@ export function ModelPicker({ purpose, onGetMore, onSaved, presentation = 'popov
     </Command>
     <div className="tetro-chooser-status" aria-live="polite">
       {saving && <p><Loader2 className="h-3 w-3 animate-spin" />Saving choice…</p>}
-      {loading && hasChoices && <p>Checking other sources…</p>}
       {ordered.filter(s => s.status === 'error').map(s => <p key={s.source.id}>Can’t reach {s.source.label}. <button type="button" disabled={saving} className="tetro-link" onClick={() => { loaders.current.push(loadModelSources([s.source], state => setStates(prev => ({ ...prev, [state.source.id]: state })))); }}>Retry</button></p>)}
       {disconnected && <p>Connect this service in Models → External models, or choose an installed model.</p>}
       {missing && !disconnected && <p>Your saved model isn’t available. Choose another or get more models below.</p>}

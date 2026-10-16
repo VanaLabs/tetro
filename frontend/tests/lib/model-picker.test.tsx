@@ -13,7 +13,7 @@ const keys = {};
 const current = { provider: 'builtin-ai', model: 'old', whisperModel: 'tiny' };
 mock.module('../../src/contexts/ConfigContext', () => ({ useConfig: () => ({ modelConfig: current, transcriptModelConfig: { provider: 'parakeet', model: 'speech' }, providerApiKeys: keys, setModelConfig: (config: unknown) => changes.push(config) }) }));
 mock.module('../../src/lib/model-activation', () => ({ activateModel: () => save(), activateNotesModel: () => save() }));
-const sources = [{ id: 'builtin-ai', label: 'Device', load: async () => ['old', 'new'].map(model => ({ provider: 'builtin-ai', model, label: model, detail: 'Stays on this device' })) }];
+const sources: import('../../src/lib/model-choices').ModelSource[] = [{ id: 'builtin-ai', label: 'Device', load: async () => ['old', 'new'].map(model => ({ provider: 'builtin-ai', model, label: model, detail: 'Stays on this device' })) }];
 const choices = await import('../../src/lib/model-choices');
 mock.module('../../src/lib/model-choices', () => ({ ...choices, modelSources: () => sources }));
 const { ModelPicker } = await import('../../src/components/tetro/ModelPicker');
@@ -58,4 +58,27 @@ test('download transcription models routes to the expanded catalogue', async () 
     if (previous) Object.defineProperty(globalThis, 'sessionStorage', previous);
     else Reflect.deleteProperty(globalThis, 'sessionStorage');
   }
+});
+
+
+test('background model discovery has no flashing status row and keeps retry errors', async () => {
+  let finish!: (value: import('../../src/lib/model-choices').ModelChoice[]) => void;
+  sources.push({ id: 'custom-openai', label: 'Custom server', load: () => new Promise(resolve => { finish = resolve; }) });
+  let view!: ReactTestRenderer;
+  try {
+    await act(async () => { view = create(<ModelPicker purpose="notes" presentation="dialog" open />); await tick(); });
+    expect(view.root.findAllByProps({ 'aria-busy': true })).toHaveLength(1);
+    expect(JSON.stringify(view.toJSON())).not.toContain('Checking other sources');
+    expect(view.root.findByProps({ className: 'tetro-chooser-status' }).children).toHaveLength(0);
+    await act(async () => { finish([]); await tick(); });
+    expect(view.root.findAllByProps({ 'aria-busy': true })).toHaveLength(0);
+    expect(view.root.findByProps({ className: 'tetro-chooser-status' }).children).toHaveLength(0);
+  } finally { act(() => view?.unmount()); sources.pop(); }
+
+  sources.push({ id: 'custom-openai', label: 'Custom server', load: async () => { throw new Error('offline'); } });
+  try {
+    await act(async () => { view = create(<ModelPicker purpose="notes" presentation="dialog" open />); await tick(); });
+    expect(JSON.stringify(view.toJSON())).toContain('Can’t reach ');
+    expect(view.root.findAllByType('button').some(button => button.children.includes('Retry'))).toBe(true);
+  } finally { act(() => view?.unmount()); sources.pop(); }
 });

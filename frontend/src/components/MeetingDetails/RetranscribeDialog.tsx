@@ -2,7 +2,9 @@
 import { LanguageChooser } from '@/components/tetro/LanguageChooser';
 import { RETRANSCRIBE_START } from '@/components/tetro/RetranscribeProgress';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { RefreshCw, Globe, Loader2, AlertCircle, CheckCircle2, X, Cpu } from 'lucide-react';
+import { RefreshCw, Globe, Loader2, AlertCircle, CheckCircle2, X, Cpu, Download } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { openTranscriptionModelDownloads } from '@/lib/model-settings-route';
 import {
   Dialog,
   DialogContent,
@@ -62,6 +64,7 @@ export function RetranscribeDialog({
   meetingFolderPath,
   onComplete,
 }: RetranscribeDialogProps) {
+  const router = useRouter();
   const { selectedLanguage, transcriptModelConfig } = useConfig();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<RetranscriptionProgress | null>(null);
@@ -357,6 +360,11 @@ export function RetranscribeDialog({
               </p>
             </div>
           )}
+
+          {!isProcessing && !error && <button type="button" className="tetro-key tetro-key-amber flex items-center gap-2" onClick={() => {
+            onOpenChange(false);
+            openTranscriptionModelDownloads(router.push);
+          }}><Download aria-hidden="true" className="h-4 w-4" />Download more models</button>}
 
           {isProcessing && progress && (
             <div className="space-y-2">

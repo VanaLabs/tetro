@@ -187,7 +187,7 @@ export function CustomServer() {
 
   const label = <span className="tetro-provider-name"><i className={saved ? 'is-on' : ''} aria-hidden="true" />Custom server</span>;
   if (saved && !editing) {
-    return <SettingRow label={label} hint={<>Any OpenAI-compatible server. <code className="tetro-key-mask">{saved.model} · {saved.endpoint}</code></>}>
+    return <SettingRow label={label} hint={<>Connected model server. <code className="tetro-key-mask">{saved.model} · {saved.endpoint}</code></>}>
       <button type="button" className="tetro-key" onClick={() => setEditing(true)}>Edit</button>
       <button type="button" className="tetro-key" onClick={remove}>Remove</button>
     </SettingRow>;
@@ -195,12 +195,12 @@ export function CustomServer() {
   return <div className="tetro-setting-row tetro-setting-row--stack">
     <div className="tetro-setting-text">
       <span className="tetro-setting-label">{label}</span>
-      <p>Any OpenAI-compatible server, such as LM Studio, vLLM or a company gateway.</p>
+      <p>Connect LM Studio, vLLM or another model server using its address and model name. The server must support the OpenAI API format.</p>
     </div>
     <form className="tetro-custom-server" onSubmit={e => { e.preventDefault(); if (valid) void save(); }}>
-      <Input value={form.endpoint} onChange={e => setForm({ ...form, endpoint: e.target.value })} placeholder="Address, e.g. http://localhost:8000/v1" aria-label="Server address" spellCheck={false} />
-      <Input value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="Model name" aria-label="Model name" spellCheck={false} />
-      <Input type="password" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })} placeholder={saved?.hasApiKey && form.endpoint.trim().replace(/\/$/, '') === saved.endpoint?.replace(/\/$/, '') ? "Key saved; leave blank to keep it" : "API key (optional)"} aria-label="API key" autoComplete="off" />
+      <label>Server address<Input value={form.endpoint} onChange={e => setForm({ ...form, endpoint: e.target.value })} placeholder="http://localhost:8000/v1" spellCheck={false} /></label>
+      <label>Model name<Input value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="Model name from your server" spellCheck={false} /></label>
+      <label>API key (optional)<Input type="password" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })} placeholder={saved?.hasApiKey && form.endpoint.trim().replace(/\/$/, '') === saved.endpoint?.replace(/\/$/, '') ? "Key saved; leave blank to keep it" : "Leave blank if not needed"} autoComplete="off" /></label>
       <div className="tetro-custom-server-actions">
         <button type="button" className="tetro-key" disabled={!valid || !!busy} onClick={test}>{busy === 'test' ? 'Testing…' : 'Test'}</button>
         <button type="submit" className="tetro-key" disabled={!valid || !!busy}>{busy === 'save' ? 'Saving…' : 'Save'}</button>
