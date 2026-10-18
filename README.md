@@ -7,6 +7,12 @@ conversations into editable summaries and action items. It can use local models 
 transcription and summaries. If you choose an external AI provider, the content
 needed for that request is sent to that provider.
 
+[![Tetro recording, transcribing, and summarizing a fictional English meeting](docs/media/tetro-demo.gif)](docs/media/tetro-demo.mp4)
+
+Record, transcribe, choose a summary template, and write a summary with action items.
+[Video version (MP4)](docs/media/tetro-demo.mp4). This demo uses fictional meeting
+audio; recording and processing waits are sped up.
+
 ## Source and brand
 
 Project-authored code and written documentation are available under the
