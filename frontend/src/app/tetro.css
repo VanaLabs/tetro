@@ -535,6 +535,7 @@ body :where(.tetro-key,.tetro-pane-toolbar button,.tetro-page-toolbar>button,.te
 .tetro-about-description { max-width:48ch; margin:4px 0 10px; }
 .tetro-about-note { color:var(--tetro-muted); }
 .tetro-about-actions { margin-top:28px; padding-bottom:8px; justify-content:flex-start; flex-wrap:wrap; gap:10px; }
+.tetro-about-feedback-hint { margin:0; padding-bottom:8px; color:var(--tetro-muted); font-size:12px; }
 .tetro-about-head { display:flex; align-items:center; gap:14px; }
 .tetro-about-head p { color:var(--tetro-muted); font-size:12.5px; }
 .tetro-privacy { display:grid; gap:10px; }

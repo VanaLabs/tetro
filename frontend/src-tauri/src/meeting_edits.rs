@@ -303,7 +303,7 @@ pub async fn restore(tx: &mut Transaction<'_, Sqlite>, meeting: &str, kind: &str
             .bind(meeting).bind(payload).execute(&mut **tx).await?;
     }
     if kind != "transcript" {
-        sqlx::query("UPDATE summary_processes SET result=json_extract(?,'$.summary'),status='completed',error=NULL,result_backup=NULL,updated_at=? WHERE meeting_id=?")
+        sqlx::query("UPDATE summary_processes SET result=json_extract(?,'$.summary'),status='completed',error=NULL,result_backup=NULL,translation_checkpoint=NULL,updated_at=? WHERE meeting_id=?")
             .bind(payload).bind(chrono::Utc::now().to_rfc3339()).bind(meeting).execute(&mut **tx).await?;
     }
     for edit_kind in ["transcript", "summary"] {
@@ -389,6 +389,7 @@ pub(crate) mod tests {
         sqlx::raw_sql(include_str!("../migrations/20250916100000_initial_schema.sql")).execute(&pool).await.unwrap();
         sqlx::raw_sql("ALTER TABLE meetings ADD COLUMN folder_path TEXT; ALTER TABLE transcripts ADD COLUMN audio_start_time REAL; ALTER TABLE transcripts ADD COLUMN audio_end_time REAL; ALTER TABLE transcripts ADD COLUMN duration REAL; ALTER TABLE transcripts ADD COLUMN speaker TEXT; ALTER TABLE summary_processes ADD COLUMN result_backup TEXT;").execute(&pool).await.unwrap();
         sqlx::raw_sql(include_str!("../migrations/20260925091000_preserve_edits.sql")).execute(&pool).await.unwrap();
+        sqlx::raw_sql(include_str!("../migrations/20261023120000_summary_translation_checkpoint.sql")).execute(&pool).await.unwrap();
         sqlx::raw_sql(include_str!("../migrations/20260923120000_add_meeting_marks.sql")).execute(&pool).await.unwrap();
         sqlx::query("INSERT INTO meetings(id,title,created_at,updated_at) VALUES('m','Test','2026-09-25T00:00:00Z','2026-09-25T00:00:00Z')").execute(&pool).await.unwrap();
         pool

@@ -25,9 +25,9 @@ reserved separately. See [BRAND.md](BRAND.md) before distributing a fork.
 
 | Platform | Download |
 | --- | --- |
-| Windows 11, Intel or AMD | [Tetro 9.1.11 for Windows x64](https://github.com/VanaLabs/tetro/releases/download/v9.1.11/Tetro_9.1.11_x64-setup.exe) |
-| Windows 11, ARM processor | [Tetro 9.1.11 for Windows ARM64](https://github.com/VanaLabs/tetro/releases/download/v9.1.11/Tetro_9.1.11_arm64-setup.exe) |
-| Apple Silicon Mac | [Tetro 9.1.11 for macOS](https://github.com/VanaLabs/tetro/releases/download/v9.1.11/Tetro_9.1.11_aarch64.dmg) |
+| Windows 11, Intel or AMD | [Tetro 9.1.12 for Windows x64](https://github.com/VanaLabs/tetro/releases/download/v9.1.12/Tetro_9.1.12_x64-setup.exe) |
+| Windows 11, ARM processor | [Tetro 9.1.12 for Windows ARM64](https://github.com/VanaLabs/tetro/releases/download/v9.1.12/Tetro_9.1.12_arm64-setup.exe) |
+| Apple Silicon Mac | [Tetro 9.1.12 for macOS](https://github.com/VanaLabs/tetro/releases/download/v9.1.12/Tetro_9.1.12_aarch64.dmg) |
 
 ## Install on Windows
 
@@ -39,7 +39,7 @@ Windows 11 is required. The installers have signed updater packages but no Windo
 
 ## Install on your Mac
 
-1. Download **Tetro_9.1.11_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
+1. Download **Tetro_9.1.12_aarch64.dmg** from the assets below. Choose the DMG, not “Source code” or the updater archive.
 2. Open the downloaded DMG, then **drag Tetro onto Applications** in that window. Wait for the copy to finish.
 3. Open **Finder → Applications → Tetro**. You can eject the Tetro disk image afterward.
 4. If macOS says Apple cannot check Tetro or the developer cannot be verified, dismiss that message with **Done** (or **OK**, depending on macOS). Keep the app in Applications.

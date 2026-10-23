@@ -3,6 +3,8 @@ use crate::summary::templates::Template;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::path::PathBuf;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
@@ -404,8 +406,15 @@ pub(crate) struct GeneratedMeetingSummary {
     pub normalization_fallback: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct EnglishSummary {
+    pub markdown: String,
+    pub successful_chunk_count: i64,
+    pub reasoning_stripped: bool,
+}
+
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn generate_meeting_summary(
+pub(crate) async fn generate_meeting_summary<F, Fut>(
     client: &Client,
     provider: &LLMProvider,
     model_name: &str,
@@ -424,8 +433,13 @@ pub(crate) async fn generate_meeting_summary(
     cancellation_token: Option<&CancellationToken>,
     summary_language: Option<&str>,
     detected_transcript_language: Option<&str>,
-    cached_english: Option<&str>,
-) -> Result<GeneratedMeetingSummary, String> {
+    cached_english: Option<&EnglishSummary>,
+    save_translation_checkpoint: F,
+) -> Result<GeneratedMeetingSummary, String>
+where
+    F: FnOnce(EnglishSummary) -> Fut,
+    Fut: Future<Output = Result<(), String>>,
+{
     if cancellation_token.is_some_and(CancellationToken::is_cancelled) {
         return Err("Summary generation was cancelled".to_string());
     }
@@ -437,9 +451,10 @@ pub(crate) async fn generate_meeting_summary(
     let (mut english_markdown, successful_chunk_count, mut reasoning_stripped) =
         if is_brief_transcript(text) {
             (brief_recording_markdown(text), 1_i64, false)
-        } else if let Some(cached) = resolve_cached_english(cached_english, summary_language) {
+        } else if let Some(cached) = resolve_cached_english(cached_english.map(|c| c.markdown.as_str()), summary_language) {
             info!("✓ Using cached English summary ({} chars), skipping pass 1", cached.len());
-            (cached.to_string(), 1_i64, false)
+            let stage = cached_english.expect("resolved English cache");
+            (cached.to_string(), stage.successful_chunk_count, stage.reasoning_stripped)
         } else {
             let mut content_to_summarize = text.to_string();
             let successful_chunk_count;
@@ -577,13 +592,31 @@ pub(crate) async fn generate_meeting_summary(
     let (final_markdown, normalization_fallback) =
         match resolve_final_language_action(summary_language, detected_transcript_language) {
             FinalLanguageAction::Translate(language) => {
+                save_translation_checkpoint(EnglishSummary {
+                    markdown: english_markdown.clone(),
+                    successful_chunk_count,
+                    reasoning_stripped,
+                }).await?;
+                if cancellation_token.is_some_and(CancellationToken::is_cancelled) {
+                    return Err("Summary generation was cancelled".to_string());
+                }
                 let translated = translate_markdown(
                     client, provider, model_name, api_key, &english_markdown, language,
                     ollama_endpoint, custom_openai_endpoint, max_tokens, temperature, top_p,
                     app_data_dir, cancellation_token,
                 )
                 .await
-                .map_err(|error| format!("Translation to {language} failed: {error}"))?;
+                .map_err(|error| {
+                    if cancellation_token.is_some_and(CancellationToken::is_cancelled) {
+                        return error;
+                    }
+                    warn!("Translation to {language} failed: {error}");
+                    if error.to_ascii_lowercase().contains("timed out") {
+                        format!("Translation to {language} took too long. Your progress is saved. Try again to retry the translation.")
+                    } else {
+                        format!("Translation to {language} failed. Your progress is saved. Check your summary model connection, then try again to retry the translation.")
+                    }
+                })?;
                 reasoning_stripped |= translated.reasoning_stripped;
                 (translated.markdown, false)
             }
@@ -709,12 +742,28 @@ async fn normalize_markdown_to_english(
 mod tests {
     use super::*;
 
+
+    #[tokio::test]
+    async fn translation_does_not_start_without_a_saved_checkpoint_or_after_cancellation() {
+        let template: Template = serde_json::from_str(r#"{"name":"Test","description":"Test","sections":[]}"#).unwrap();
+        let english = EnglishSummary { markdown: "# Notes\nAnna will send the report.".into(), successful_chunk_count: 1, reasoning_stripped: false };
+        let text = "word ".repeat(60);
+        let token = CancellationToken::new();
+        // Built-in AI has no model directory here. Reaching the transform would
+        // fail differently, so these assertions guard the ordering of the boundary.
+        let result = generate_meeting_summary(&Client::new(), &LLMProvider::BuiltInAI,"test","",&text,"","test",&template,100000,None,None,None,None,None,None,Some(&token),Some("hy"),Some("hy"),Some(&english),|_| async { Err("Checkpoint could not be saved".to_string()) }).await;
+        assert_eq!(result.unwrap_err(), "Checkpoint could not be saved");
+        let cancel = token.clone();
+        let result = generate_meeting_summary(&Client::new(), &LLMProvider::BuiltInAI,"test","",&text,"","test",&template,100000,None,None,None,None,None,None,Some(&token),Some("hy"),Some("hy"),Some(&english),|_| async move { cancel.cancel(); Ok(()) }).await;
+        assert_eq!(result.unwrap_err(), "Summary generation was cancelled");
+    }
+
     #[tokio::test]
     async fn brief_transcript_ignores_fictional_template_and_cached_story_without_calling_model() {
         let template: Template = serde_json::from_str(r#"{"name":"Friends","description":"Catch-up","sections":[{"title":"Life Updates - Sarah","instruction":"Describe Sarah's trip to Italy","format":"paragraph"}]}"#).unwrap();
         let source = "[00:01] Friends\n[00:04] to see you. Thank you.\n[00:06] very happy to hear from you";
         // No built-in model directory: this test would fail if generation were attempted.
-        let result = generate_meeting_summary(&Client::new(), &LLMProvider::BuiltInAI, "qwen3.5:2b", "", source, "", "friends", &template, 1748, None, None, None, None, None, None, None, None, None, Some("# A Celebration\nSarah traveled to Italy.")).await.unwrap();
+        let result = generate_meeting_summary(&Client::new(), &LLMProvider::BuiltInAI, "qwen3.5:2b", "", source, "", "friends", &template, 1748, None, None, None, None, None, None, None, None, None, Some(&EnglishSummary { markdown: "# A Celebration\nSarah traveled to Italy.".into(), successful_chunk_count: 1, reasoning_stripped: false }), |_| async { Ok(()) }).await.unwrap();
         assert!(result.final_markdown.contains(r"> \[00:01\] Friends"));
         assert!(result.final_markdown.contains("too short for a detailed summary"));
         for invented in ["Sarah", "Italy", "Celebration", "Mark", "Emily"] { assert!(!result.final_markdown.contains(invented)); }

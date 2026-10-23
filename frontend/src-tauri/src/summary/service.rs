@@ -6,7 +6,7 @@ use crate::summary::language_detection::detect_summary_language;
 use crate::summary::metadata::read_detected_summary_language_from_metadata;
 use crate::summary::processor::{
     clean_llm_markdown_detailed, extract_meeting_name_from_markdown, generate_meeting_summary,
-    language_name_from_code, require_visible_markdown,
+    language_name_from_code, require_visible_markdown, EnglishSummary,
 };
 use crate::summary::templates::{self, Template};
 use crate::ollama::metadata::ModelMetadataCache;
@@ -80,6 +80,34 @@ struct EnglishSummaryCache {
     markdown: String,
     source: SummaryCacheSource,
     output_language: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TranslationCheckpoint {
+    english: EnglishSummary,
+    source: SummaryCacheSource,
+    target_language: String,
+}
+
+fn extract_translation_checkpoint(
+    raw: &str,
+    source: &SummaryCacheSource,
+    language: Option<&str>,
+) -> Option<EnglishSummary> {
+    let target = normalise_summary_language_for_cache(language)?;
+    if target == "English" { return None; }
+    let checkpoint: TranslationCheckpoint = serde_json::from_str(raw).ok()?;
+    if checkpoint.source != *source || checkpoint.target_language != target {
+        return None;
+    }
+    let cleaned = clean_llm_markdown_detailed(&checkpoint.english.markdown);
+    require_visible_markdown("Saved summary", &cleaned).ok()?;
+    if checkpoint.english.successful_chunk_count < 1 { return None; }
+    Some(EnglishSummary {
+        markdown: cleaned.markdown,
+        reasoning_stripped: checkpoint.english.reasoning_stripped || cleaned.reasoning_stripped,
+        ..checkpoint.english
+    })
 }
 
 fn stable_text_fingerprint(text: &str) -> String {
@@ -548,6 +576,25 @@ impl SummaryService {
             }),
         };
 
+        let resumed_english = match SummaryProcessesRepository::get_translation_checkpoint(&pool, &meeting_id, started_at).await {
+            Ok(Some(raw)) => extract_translation_checkpoint(&raw, &cache_source, summary_language.as_deref()),
+            Ok(None) => None,
+            Err(error) => {
+                Self::fail_and_cleanup(&pool, &meeting_id, started_at, &format!("Could not read saved translation progress: {error}")).await;
+                return;
+            }
+        };
+        let cached_english = resumed_english.or_else(|| cached_english.map(|markdown| EnglishSummary {
+            markdown,
+            successful_chunk_count: 1,
+            reasoning_stripped: false,
+        }));
+        let checkpoint_pool = pool.clone();
+        let checkpoint_meeting = meeting_id.clone();
+        let checkpoint_source = cache_source.clone();
+        let checkpoint_language = normalise_summary_language_for_cache(summary_language.as_deref());
+        let checkpoint_cancellation = cancellation_token.clone();
+
         let result = async {
         let client = crate::network_security::client()?;
         generate_meeting_summary(
@@ -569,7 +616,26 @@ impl SummaryService {
             Some(&cancellation_token),
             summary_language.as_deref(),
             detected_summary_language.as_deref(),
-            cached_english.as_deref(),
+            cached_english.as_ref(),
+            move |english| async move {
+                if checkpoint_cancellation.is_cancelled() {
+                    return Err("Summary generation was cancelled".to_string());
+                }
+                let checkpoint = TranslationCheckpoint {
+                    english,
+                    source: checkpoint_source,
+                    target_language: checkpoint_language.ok_or("No translation language selected")?,
+                };
+                let raw = serde_json::to_string(&checkpoint).map_err(|e| e.to_string())?;
+                match SummaryProcessesRepository::save_translation_checkpoint(&checkpoint_pool, &checkpoint_meeting, started_at, &raw).await {
+                    Ok(true) => Ok(()),
+                    Ok(false) => Err("Summary generation was superseded or cancelled".to_string()),
+                    Err(error) => {
+                        warn!("Could not save translation checkpoint: {error}");
+                        Err("Could not save translation progress. Please try again.".to_string())
+                    }
+                }
+            },
         )
         .await
         }.await;
@@ -1117,6 +1183,119 @@ mod tests {
         let raw = r#"{ not valid json"#;
         assert!(extract_cached_english_markdown(raw, &sample_cache_source(), Some("de")).is_err());
     }
+    #[test]
+    fn translation_checkpoint_rejects_changed_inputs_and_invalid_content() {
+        let source = sample_cache_source();
+        let checkpoint = TranslationCheckpoint {
+            english: EnglishSummary { markdown: "# Title\n## Summary\nAnna will send the report.".into(), successful_chunk_count: 3, reasoning_stripped: true },
+            source: source.clone(), target_language: "Armenian".into(),
+        };
+        let raw = serde_json::to_string(&checkpoint).unwrap();
+        let recovered = extract_translation_checkpoint(&raw, &source, Some("hy")).unwrap();
+        assert_eq!(recovered.successful_chunk_count, 3);
+        assert!(recovered.reasoning_stripped);
+        assert!(extract_translation_checkpoint(&raw, &source, Some("fr")).is_none());
+        assert!(extract_translation_checkpoint(&raw, &source, Some("en")).is_none());
+        for field in ["transcript_fingerprint", "custom_prompt_fingerprint", "template_id", "template_fingerprint", "model_provider", "model_name", "ollama_endpoint", "custom_openai_endpoint"] {
+            let mut changed = serde_json::to_value(&source).unwrap();
+            changed[field] = serde_json::json!("changed");
+            let changed: SummaryCacheSource = serde_json::from_value(changed).unwrap();
+            assert!(extract_translation_checkpoint(&raw, &changed, Some("hy")).is_none(), "{field}");
+        }
+        let mut changed = source.clone(); changed.max_tokens = Some(42);
+        assert!(extract_translation_checkpoint(&raw, &changed, Some("hy")).is_none());
+        changed = source.clone(); changed.temperature = Some(0.7);
+        assert!(extract_translation_checkpoint(&raw, &changed, Some("hy")).is_none());
+        changed = source.clone(); changed.top_p = Some(0.7);
+        assert!(extract_translation_checkpoint(&raw, &changed, Some("hy")).is_none());
+        changed = source.clone(); changed.token_threshold += 1;
+        assert!(extract_translation_checkpoint(&raw, &changed, Some("hy")).is_none());
+        let mut invalid = checkpoint; invalid.english.markdown = "<think>unfinished".into();
+        assert!(extract_translation_checkpoint(&serde_json::to_string(&invalid).unwrap(), &source, Some("hy")).is_none());
+        assert!(extract_translation_checkpoint("broken JSON", &source, Some("hy")).is_none());
+    }
+
+    #[tokio::test]
+    async fn failed_translation_is_durable_and_retry_calls_only_translation() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        tokio::time::timeout(Duration::from_secs(5), async {
+            let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+            sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+            sqlx::query("INSERT INTO meetings(id,title,created_at,updated_at) VALUES('recovery','Test',?,?)")
+                .bind(Utc::now()).bind(Utc::now()).execute(&pool).await.unwrap();
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let endpoint = format!("http://{}/v1", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                let mut requests = Vec::new();
+                for index in 0..3 {
+                    let (mut stream, _) = listener.accept().await.unwrap();
+                    let mut bytes = Vec::new();
+                    let body = loop {
+                        let mut buffer = [0;4096];
+                        let n = stream.read(&mut buffer).await.unwrap();
+                        assert!(n>0); bytes.extend_from_slice(&buffer[..n]);
+                        if let Some(end) = bytes.windows(4).position(|w|w==b"\r\n\r\n").map(|p|p+4) {
+                            let length: usize = std::str::from_utf8(&bytes[..end]).unwrap().lines().find_map(|l|{
+                                let (key,value) = l.split_once(':')?;
+                                key.eq_ignore_ascii_case("content-length").then(||value.trim().parse().unwrap())
+                            }).unwrap();
+                            if bytes.len()>=end+length { break serde_json::from_slice::<serde_json::Value>(&bytes[end..end+length]).unwrap(); }
+                        }
+                    };
+                    requests.push(body);
+                    let (status,body) = if index==1 { ("503 Unavailable", "{}".to_string()) } else {
+                        let text = if index==0 { "# Meeting\n\n## Summary\nAnna will send the report on Tuesday." } else { "# Հանդիպում\n\n## Ամփոփում\nԱննան զեկույցը կուղարկի երեքշաբթի։" };
+                        ("200 OK", serde_json::json!({"choices":[{"message":{"content":text}}]}).to_string())
+                    };
+                    let response = format!("HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len());
+                    stream.write_all(response.as_bytes()).await.unwrap();
+                }
+                requests
+            });
+            let template: Template = serde_json::from_value(serde_json::json!({"name":"Test","description":"Test","sections":[{"title":"Summary","instruction":"Summarize the source","format":"paragraph"}]})).unwrap();
+            let text = "Anna will send the report on Tuesday. ".repeat(10);
+            let source = build_summary_cache_source(&text,"","test",&template_cache_fingerprint(&template),100000,"custom-openai","test",None,Some(&endpoint),None,None,None);
+            let client = crate::network_security::client().unwrap();
+            let mut cached = None;
+            for attempt in 0..2 {
+                let start = Utc::now();
+                SummaryProcessesRepository::create_or_reset_process(&pool,"recovery",start,attempt==1).await.unwrap();
+                if attempt==1 {
+                    let raw = SummaryProcessesRepository::get_translation_checkpoint(&pool,"recovery",start).await.unwrap().unwrap();
+                    cached = extract_translation_checkpoint(&raw,&source,Some("hy"));
+                    assert!(cached.is_some());
+                }
+                let result = generate_meeting_summary(&client,&LLMProvider::CustomOpenAI,"test","",&text,"","test",&template,100000,None,Some(&endpoint),None,None,None,None,None,Some("hy"),Some("hy"),cached.as_ref(),|english| {
+                    let raw = serde_json::to_string(&TranslationCheckpoint {english,source:source.clone(),target_language:"Armenian".into()}).unwrap();
+                    let pool = &pool;
+                    async move {
+                        assert!(SummaryProcessesRepository::save_translation_checkpoint(pool,"recovery",start,&raw).await.unwrap());
+                        Ok(())
+                    }
+                }).await;
+                if attempt==0 {
+                    let error = result.unwrap_err();
+                    assert!(error.contains("Your progress is saved"));
+                    SummaryProcessesRepository::update_process_failed(&pool,"recovery",start,&error).await.unwrap();
+                    let row: (String,Option<String>,Option<String>) = sqlx::query_as("SELECT status,result,translation_checkpoint FROM summary_processes WHERE meeting_id='recovery'").fetch_one(&pool).await.unwrap();
+                    assert_eq!(row.0,"failed"); assert!(row.1.is_none()); assert!(row.2.is_some());
+                } else {
+                    let result = result.unwrap();
+                    assert!(result.final_markdown.contains("Աննան"));
+                    assert!(result.english_markdown.contains("Anna"));
+                    let value = build_summary_result_json(&result.final_markdown,&result.english_markdown,source.clone(),Some("hy"),false,false).unwrap();
+                    SummaryProcessesRepository::update_process_completed(&pool,"recovery",start,value,1,1.0).await.unwrap();
+                }
+            }
+            let requests = server.await.unwrap();
+            assert_eq!(requests.len(),3);
+            assert!(requests[0]["messages"][1]["content"].as_str().unwrap().contains("transcript_chunks"));
+            for request in &requests[1..] { assert!(request["messages"][1]["content"].as_str().unwrap().starts_with("Translate the following Markdown")); }
+            let checkpoint: Option<String> = sqlx::query_scalar("SELECT translation_checkpoint FROM summary_processes WHERE meeting_id='recovery'").fetch_one(&pool).await.unwrap();
+            assert!(checkpoint.is_none());
+        }).await.expect("recovery test should finish promptly");
+    }
+
 }
 
 /// Names Tetro generates for new recordings ("Meeting 23-09-2026 14:05", legacy
@@ -1141,4 +1320,6 @@ mod default_name_tests {
         assert!(!is_default_meeting_name("Meeting with Acme"));
         assert!(!is_default_meeting_name("Budget review"));
     }
+
+
 }

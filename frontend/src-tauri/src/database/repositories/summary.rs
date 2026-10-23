@@ -89,6 +89,7 @@ impl SummaryProcessesRepository {
         pool: &SqlitePool,
         meeting_id: &str,
         started_at: DateTime<Utc>,
+        resume_translation: bool,
     ) -> Result<(), sqlx::Error> {
         log_info!(
             "Creating or resetting summary process for meeting_id: {}",
@@ -105,6 +106,7 @@ impl SummaryProcessesRepository {
                 result_backup = result,
                 result_backup_timestamp = excluded.updated_at,
                 result = result,
+                translation_checkpoint = CASE WHEN ? AND LOWER(status) = 'failed' THEN translation_checkpoint ELSE NULL END,
                 error = NULL
             "#
         )
@@ -112,6 +114,7 @@ impl SummaryProcessesRepository {
         .bind(started_at)
         .bind(started_at)
         .bind(started_at)
+        .bind(resume_translation)
         .execute(pool)
         .await?;
         log_info!(
@@ -119,6 +122,28 @@ impl SummaryProcessesRepository {
             meeting_id
         );
         Ok(())
+    }
+
+    pub async fn get_translation_checkpoint(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        started_at: DateTime<Utc>,
+    ) -> Result<Option<String>, sqlx::Error> {
+        Ok(sqlx::query_scalar::<_, Option<String>>(
+            "SELECT translation_checkpoint FROM summary_processes WHERE meeting_id = ? AND start_time = ? AND LOWER(status) = 'pending'",
+        ).bind(meeting_id).bind(started_at).fetch_optional(pool).await?.flatten())
+    }
+
+    pub async fn save_translation_checkpoint(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        started_at: DateTime<Utc>,
+        checkpoint: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let update = sqlx::query(
+            "UPDATE summary_processes SET translation_checkpoint = ? WHERE meeting_id = ? AND start_time = ? AND LOWER(status) = 'pending'",
+        ).bind(checkpoint).bind(meeting_id).bind(started_at).execute(pool).await?;
+        Ok(update.rows_affected() == 1)
     }
 
     pub async fn update_process_completed(
@@ -136,7 +161,7 @@ impl SummaryProcessesRepository {
         let update = sqlx::query(
             r#"
             UPDATE summary_processes
-            SET status = 'completed', result = ?, updated_at = ?, end_time = ?, chunk_count = ?, processing_time = ?, error = NULL, result_backup = NULL, result_backup_timestamp = NULL
+            SET status = 'completed', result = ?, updated_at = ?, end_time = ?, chunk_count = ?, processing_time = ?, error = NULL, result_backup = NULL, result_backup_timestamp = NULL, translation_checkpoint = NULL
             WHERE meeting_id = ? AND start_time = ? AND LOWER(status) = 'pending'
             "#
         )
@@ -199,6 +224,7 @@ impl SummaryProcessesRepository {
                 updated_at = ?,
                 end_time = ?,
                 error = 'Generation was cancelled by user',
+                translation_checkpoint = NULL,
                 result = COALESCE(result_backup, result),
                 result_backup = NULL,
                 result_backup_timestamp = NULL
@@ -235,7 +261,8 @@ mod tests {
                 end_time TEXT,
                 chunk_count INTEGER,
                 processing_time REAL,
-                error TEXT
+                error TEXT,
+                translation_checkpoint TEXT
             )",
         )
         .execute(&pool)
@@ -362,4 +389,43 @@ mod tests {
                 .unwrap();
         assert_eq!(status, "PENDING");
     }
+
+    #[tokio::test]
+    async fn translation_failure_keeps_checkpoint_and_previous_summary_until_retry_finishes() {
+        let pool = test_pool().await;
+        let start = Utc::now();
+        let previous = r#"{"markdown":"My edited summary"}"#;
+        seed_pending(&pool, "retry", start, Some(previous), Some(previous)).await;
+        assert!(SummaryProcessesRepository::save_translation_checkpoint(&pool, "retry", start, "checkpoint").await.unwrap());
+        assert!(SummaryProcessesRepository::update_process_failed(&pool, "retry", start, "Translation timed out").await.unwrap());
+        let saved: (String,String) = sqlx::query_as("SELECT result,translation_checkpoint FROM summary_processes WHERE meeting_id='retry'").fetch_one(&pool).await.unwrap();
+        assert_eq!(saved, (previous.into(), "checkpoint".into()));
+        let retry = start + chrono::Duration::seconds(1);
+        SummaryProcessesRepository::create_or_reset_process(&pool, "retry", retry, true).await.unwrap();
+        assert_eq!(SummaryProcessesRepository::get_translation_checkpoint(&pool, "retry", retry).await.unwrap().as_deref(), Some("checkpoint"));
+        assert!(!SummaryProcessesRepository::save_translation_checkpoint(&pool, "retry", start, "stale").await.unwrap());
+        assert!(!SummaryProcessesRepository::update_process_completed(&pool, "retry", start, json!({"markdown":"late"}), 1, 1.0).await.unwrap());
+        assert!(SummaryProcessesRepository::update_process_completed(&pool, "retry", retry, json!({"markdown":"Translated"}), 1, 1.0).await.unwrap());
+        let checkpoint: Option<String> = sqlx::query_scalar("SELECT translation_checkpoint FROM summary_processes WHERE meeting_id='retry'").fetch_one(&pool).await.unwrap();
+        assert!(checkpoint.is_none());
+    }
+
+    #[tokio::test]
+    async fn fresh_generation_and_cancel_clear_translation_checkpoints() {
+        let pool = test_pool().await;
+        let start = Utc::now();
+        seed_pending(&pool, "fresh", start, None, None).await;
+        SummaryProcessesRepository::save_translation_checkpoint(&pool, "fresh", start, "old").await.unwrap();
+        SummaryProcessesRepository::update_process_failed(&pool, "fresh", start, "failed").await.unwrap();
+        let next = start + chrono::Duration::seconds(1);
+        SummaryProcessesRepository::create_or_reset_process(&pool, "fresh", next, false).await.unwrap();
+        assert!(SummaryProcessesRepository::get_translation_checkpoint(&pool, "fresh", next).await.unwrap().is_none());
+        SummaryProcessesRepository::save_translation_checkpoint(&pool, "fresh", next, "new").await.unwrap();
+        assert!(SummaryProcessesRepository::update_process_cancelled(&pool, "fresh", next).await.unwrap());
+        assert!(!SummaryProcessesRepository::save_translation_checkpoint(&pool, "fresh", next, "late").await.unwrap());
+        let retry = next + chrono::Duration::seconds(1);
+        SummaryProcessesRepository::create_or_reset_process(&pool, "fresh", retry, true).await.unwrap();
+        assert!(SummaryProcessesRepository::get_translation_checkpoint(&pool, "fresh", retry).await.unwrap().is_none());
+    }
+
 }

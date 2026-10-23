@@ -35,7 +35,7 @@ pub async fn move_to_trash(pool: &SqlitePool, meeting: &str, parts: Parts) -> Re
             sqlx::query("DELETE FROM meeting_edits WHERE meeting_id=? AND kind='transcript'").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
         }
         if parts.summary {
-            sqlx::query("UPDATE summary_processes SET result=NULL,result_backup=NULL,status='idle',error=NULL WHERE meeting_id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
+            sqlx::query("UPDATE summary_processes SET result=NULL,result_backup=NULL,translation_checkpoint=NULL,status='idle',error=NULL WHERE meeting_id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
             sqlx::query("DELETE FROM meeting_edits WHERE meeting_id=? AND kind='summary'").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
             sqlx::query("DELETE FROM meeting_action_items WHERE meeting_id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;
             sqlx::query("DELETE FROM meeting_action_sources WHERE meeting_id=?").bind(meeting).execute(&mut *tx).await.map_err(|e|e.to_string())?;

@@ -117,11 +117,11 @@ export function useSummaryGeneration({
       case 'completed':
         return 'Summary completed';
       case 'error':
-        return 'Error generating summary';
+        return summaryError || 'Error generating summary';
       default:
         return '';
     }
-  }, []);
+  }, [summaryError]);
 
   const failGeneration = useCallback(async (
     generationId: number,
@@ -192,8 +192,8 @@ export function useSummaryGeneration({
         const restoredSummary = parseSummaryContent(existing.data);
         if (restoredSummary) {
           setAiSummary(restoredSummary);
-          setSummaryStatus('completed');
-          setSummaryError(null);
+          setSummaryStatus('error');
+          setSummaryError(errorMessage);
           toast.error('Failed to regenerate summary', {
             description: `${errorMessage}. Your previous summary has been restored.`,
           });
@@ -265,11 +265,13 @@ export function useSummaryGeneration({
     transcriptTexts,
     customPrompt = '',
     isRegeneration = false,
+    resumeTranslation = false,
   }: {
     transcriptText: string;
     transcriptTexts?: string[];
     customPrompt?: string;
     isRegeneration?: boolean;
+    resumeTranslation?: boolean;
   }) => {
     const generationId = ++generationIdRef.current;
     activeProcessIdRef.current = null;
@@ -300,6 +302,7 @@ export function useSummaryGeneration({
         customPrompt,
         templateId: selectedTemplate,
         summaryLanguage,
+        resumeTranslation,
       });
       const processId = result.process_id;
       if (!mountedRef.current || visibleMeetingIdRef.current !== meeting.id) return;
@@ -430,6 +433,7 @@ export function useSummaryGeneration({
     await processSummary({
       ...buildSummaryTranscriptPayload(allTranscripts),
       customPrompt,
+      resumeTranslation: summaryStatus === 'error',
     });
   }, [
     buildSummaryTranscriptPayload,
@@ -440,10 +444,11 @@ export function useSummaryGeneration({
     onOpenModelSettings,
     processSummary,
     showPreflightError,
+    summaryStatus,
   ]);
 
   // Public API: Regenerate summary from the current saved transcript
-  const handleRegenerateSummary = useCallback(async () => {
+  const handleRegenerateSummary = useCallback(async (customPrompt: string = '') => {
     const allTranscripts = await fetchAllTranscripts(meeting.id);
 
     if (!allTranscripts.length) {
@@ -454,9 +459,11 @@ export function useSummaryGeneration({
 
     await processSummary({
       ...buildSummaryTranscriptPayload(allTranscripts),
-      isRegeneration: true
+      isRegeneration: true,
+      customPrompt,
+      resumeTranslation: summaryStatus === 'error',
     });
-  }, [meeting.id, fetchAllTranscripts, buildSummaryTranscriptPayload, processSummary]);
+  }, [meeting.id, fetchAllTranscripts, buildSummaryTranscriptPayload, processSummary, summaryStatus]);
 
   // Public API: Stop ongoing summary generation
   const handleStopGeneration = useCallback(async () => {

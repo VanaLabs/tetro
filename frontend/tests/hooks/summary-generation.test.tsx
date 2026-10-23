@@ -161,7 +161,8 @@ describe('summary state restored when returning to a meeting', () => {
     expect(text()).toContain('processing');
     getSummary = async () => response({ status: 'failed', error: 'Model unavailable', data: { markdown: 'Previous summary' } });
     await tick();
-    expect(text()).toContain('completed');
+    expect(state.summaryStatus).toBe('error');
+    expect(state.summaryError).toBe('Model unavailable');
     expect(text()).toContain('Previous summary');
   });
 
@@ -280,4 +281,30 @@ test('changing from Armenian to English after stopping uses the new language', a
   chosenLanguage = 'en';
   await act(async () => state.handleRegenerateSummary());
   expect(invoke.mock.calls.filter(([cmd]) => cmd === 'api_process_transcript').at(-1)?.[1]?.summaryLanguage).toBe('en');
+});
+
+
+test('retrying a failed translation requests recovery with the current context', async () => {
+  chosenLanguage = 'hy';
+  await show(response({ status: 'failed', error: 'Translation to Armenian took too long. Your progress is saved.' }));
+  await act(async () => state.handleGenerateSummary('Keep the budget details'));
+  const args = invoke.mock.calls.filter(([cmd]) => cmd === 'api_process_transcript').at(-1)?.[1];
+  expect(args?.resumeTranslation).toBe(true);
+  expect(args?.customPrompt).toBe('Keep the budget details');
+  expect(args?.summaryLanguage).toBe('hy');
+});
+
+test('writing again after success requests a fresh summary', async () => {
+  await show(response({ status: 'completed', data: { markdown: 'Saved notes' } }));
+  await act(async () => state.handleGenerateSummary());
+  expect(invoke.mock.calls.filter(([cmd]) => cmd === 'api_process_transcript').at(-1)?.[1]?.resumeTranslation).toBe(false);
+});
+
+test('retrying a failed regeneration retains previous notes and requests translation recovery', async () => {
+  await show(response({ status: 'failed', error: 'Translation failed', data: { markdown: 'My edited notes' } }));
+  await act(async () => state.handleRegenerateSummary('Keep the budget details'));
+  const args = invoke.mock.calls.filter(([cmd]) => cmd === 'api_process_transcript').at(-1)?.[1];
+  expect(args?.resumeTranslation).toBe(true);
+  expect(args?.customPrompt).toBe('Keep the budget details');
+  expect(text()).toContain('My edited notes');
 });

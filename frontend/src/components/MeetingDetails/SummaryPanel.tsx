@@ -55,7 +55,7 @@ interface SummaryPanelProps {
   onSummaryChange: (summary: Summary) => void;
   onDirtyChange: (isDirty: boolean) => void;
   summaryError: string | null;
-  onRegenerateSummary: () => Promise<void>;
+  onRegenerateSummary: (customPrompt?: string) => Promise<void>;
   getSummaryStatusMessage: (status: 'idle' | 'processing' | 'summarizing' | 'regenerating' | 'completed' | 'error') => string;
   availableTemplates: Array<{ id: string, name: string, description: string }>;
   selectedTemplate: string;
@@ -292,7 +292,7 @@ export function SummaryPanel({
               error={summaryError}
               onRegenerateSummary={() => {
 
-                if (!languageSaveLoopRunningRef.current) onRegenerateSummary();
+                if (!languageSaveLoopRunningRef.current) onRegenerateSummary(customPrompt);
               }}
               meeting={{
                 id: meeting.id,

@@ -6,7 +6,7 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-const REQUEST_TIMEOUT_DURATION: Duration = Duration::from_secs(300);
+const REQUEST_TIMEOUT_DURATION: Duration = Duration::from_secs(900);
 
 async fn await_or_cancel<T>(
     operation: impl Future<Output = T>,
@@ -271,6 +271,30 @@ pub(crate) async fn generate_summary(
     app_data_dir: Option<&PathBuf>,
     cancellation_token: Option<&CancellationToken>,
 ) -> Result<LlmCompletion, String> {
+    generate_summary_with_timeout(
+        client, provider, model_name, api_key, system_prompt, user_prompt,
+        ollama_endpoint, custom_openai_endpoint, max_tokens, temperature, top_p,
+        app_data_dir, cancellation_token, REQUEST_TIMEOUT_DURATION,
+    ).await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn generate_summary_with_timeout(
+    client: &Client,
+    provider: &LLMProvider,
+    model_name: &str,
+    api_key: &str,
+    system_prompt: &str,
+    user_prompt: &str,
+    ollama_endpoint: Option<&str>,
+    custom_openai_endpoint: Option<&str>,
+    max_tokens: Option<u32>,
+    temperature: Option<f32>,
+    top_p: Option<f32>,
+    app_data_dir: Option<&PathBuf>,
+    cancellation_token: Option<&CancellationToken>,
+    request_timeout: Duration,
+) -> Result<LlmCompletion, String> {
     // Check if cancelled before starting
     if let Some(token) = cancellation_token {
         if token.is_cancelled() {
@@ -405,7 +429,7 @@ pub(crate) async fn generate_summary(
         .post(api_url.clone())
         .headers(headers.clone())
         .json(&request_body)
-        .timeout(REQUEST_TIMEOUT_DURATION)
+        .timeout(request_timeout)
         .send();
 
     // Use tokio::select to race between cancellation and request completion
@@ -416,7 +440,7 @@ pub(crate) async fn generate_summary(
                     if e.is_timeout() {
                         format!(
                             "LLM request timed out after {} seconds",
-                            REQUEST_TIMEOUT_DURATION.as_secs()
+                            request_timeout.as_secs()
                         )
                     } else {
                         format!("Failed to send request to LLM: {}", e)
@@ -432,7 +456,7 @@ pub(crate) async fn generate_summary(
             if e.is_timeout() {
                 format!(
                     "LLM request timed out after {} seconds",
-                    REQUEST_TIMEOUT_DURATION.as_secs()
+                    request_timeout.as_secs()
                 )
             } else {
                 format!("Failed to send request to LLM: {}", e)
@@ -464,7 +488,7 @@ pub(crate) async fn generate_summary(
             .post(api_url)
             .headers(headers)
             .json(&retry_body)
-            .timeout(REQUEST_TIMEOUT_DURATION)
+            .timeout(request_timeout)
             .send();
         await_or_cancel(retry_future, cancellation_token)
             .await?
@@ -472,7 +496,7 @@ pub(crate) async fn generate_summary(
                 if e.is_timeout() {
                     format!(
                         "LLM retry request timed out after {} seconds",
-                        REQUEST_TIMEOUT_DURATION.as_secs()
+                        request_timeout.as_secs()
                     )
                 } else {
                     format!("Failed to send retry request to LLM: {}", e)
@@ -915,6 +939,53 @@ mod tests {
             })
         );
     }
+    #[tokio::test]
+    async fn external_deadline_is_bounded_and_slow_responses_can_finish() {
+        assert_eq!(REQUEST_TIMEOUT_DURATION, Duration::from_secs(900));
+        for (deadline, succeeds) in [(Duration::from_millis(20), false), (Duration::from_secs(2), true)] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let endpoint = format!("http://{}", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                read_http_request(&mut stream).await;
+                tokio::time::sleep(Duration::from_millis(80)).await;
+                let body = r#"{"choices":[{"message":{"content":"Finished"}}]}"#;
+                let headers = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                let _ = stream.write_all(format!("{headers}{body}").as_bytes()).await;
+            });
+            let result = generate_summary_with_timeout(&Client::new(), &LLMProvider::CustomOpenAI,
+                "test", "", "system", "user", None, Some(&endpoint), None, None, None, None, None, deadline).await;
+            if succeeds { assert_eq!(result.unwrap().content, "Finished"); }
+            else { assert!(result.unwrap_err().contains("timed out")); }
+            server.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn long_external_request_can_be_cancelled_before_headers() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        let (sent, ready) = oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            read_http_request(&mut stream).await;
+            let _ = sent.send(());
+            std::future::pending::<()>().await;
+        });
+        let token = CancellationToken::new();
+        let client = Client::new();
+        let generation = generate_summary(&client, &LLMProvider::CustomOpenAI,
+            "test", "", "system", "user", None, Some(&endpoint), None, None, None, None, Some(&token));
+        tokio::pin!(generation);
+        tokio::select! {
+            _ = ready => {},
+            result = &mut generation => panic!("unexpected early result: {result:?}"),
+        }
+        token.cancel();
+        assert_eq!(timeout(Duration::from_secs(1), &mut generation).await.unwrap().unwrap_err(), "Summary generation was cancelled");
+        server.abort();
+    }
+
 }
 
 /// Helper function to get provider name for logging
@@ -928,4 +999,6 @@ fn provider_name(provider: &LLMProvider) -> &str {
         LLMProvider::OpenRouter => "OpenRouter",
         LLMProvider::CustomOpenAI => "Custom OpenAI",
     }
+
+
 }

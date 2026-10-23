@@ -1,12 +1,14 @@
 'use client';
 import { TetroLiveBrand } from '@/components/tetro/TetroBrand';
 import { Segmented } from '@/components/tetro/SettingRow';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { useUpdateCheckContext } from './UpdateCheckProvider';
 import { reflowLicenseText } from '@/lib/license-text';
+import { feedbackUrl } from '@/lib/feedback';
 
 const PRIVACY: [string, string][] = [
   ['Saved on this device', 'Tetro saves recordings, transcripts, summaries and templates on this device. A folder you choose may be synced by another app.'],
@@ -20,6 +22,22 @@ export function About() {
   const [version, setVersion] = useState('');
   const [tab, setTab] = useState<'about' | 'privacy' | 'licenses'>('about');
   const [licenses, setLicenses] = useState('');
+  const [openingFeedback, setOpeningFeedback] = useState(false);
+  const feedbackPending = useRef(false);
+  const feedbackHintId = useId();
+  const openFeedback = async () => {
+    if (feedbackPending.current) return;
+    feedbackPending.current = true;
+    setOpeningFeedback(true);
+    try {
+      await invoke('open_external_url', { url: feedbackUrl(version) });
+    } catch {
+      toast.error('Could not open GitHub. Please try again.');
+    } finally {
+      feedbackPending.current = false;
+      setOpeningFeedback(false);
+    }
+  };
   useEffect(() => { getVersion().then(setVersion).catch(() => setVersion('unavailable')); }, []);
   useEffect(() => { if (tab === 'licenses' && !licenses) void fetch('/tetro/licenses.txt').then(r => { if (!r.ok) throw new Error(); return r.text(); }).then(setLicenses).catch(() => setLicenses('Could not load the license notices. Close and reopen this window to try again.')); }, [tab, licenses]);
   return <div className="tetro-about">
@@ -28,7 +46,12 @@ export function About() {
       <div className="tetro-about-identity"><h2 aria-label="Tetro"><TetroLiveBrand variant="about" /></h2><p>Vana Labs · {version ? `v${version}` : '…'}</p></div>
       <p className="tetro-about-description">Record conversations. Turn them into transcripts, summaries and action items.</p>
       <p className="tetro-about-note">Use local models or connect your own provider.</p>
-      <div className="tetro-dialog-actions tetro-about-actions"><button onClick={() => void invoke('open_external_url', { url: 'https://vanalabs.co' }).catch(e => toast.error(String(e)))}>Vana Labs</button><button onClick={() => setTab('licenses')}>Licenses</button><button disabled={isChecking} onClick={() => updateInfo?.available ? showUpdateDialog() : void checkForUpdates(true)}>{isChecking ? 'Checking…' : updateInfo?.available ? 'Update available' : 'Check for updates'}</button></div>
+      <div className="tetro-dialog-actions tetro-about-actions">
+        <button onClick={() => void invoke('open_external_url', { url: 'https://vanalabs.co' }).catch(e => toast.error(String(e)))}>Vana Labs</button>
+        <button type="button" disabled={openingFeedback} aria-busy={openingFeedback} aria-describedby={feedbackHintId} onClick={() => void openFeedback()}>Send feedback <ExternalLink size={14} aria-hidden="true" /></button>
+        <button disabled={isChecking} onClick={() => updateInfo?.available ? showUpdateDialog() : void checkForUpdates(true)}>{isChecking ? 'Checking…' : updateInfo?.available ? 'Update available' : 'Check for updates'}</button>
+      </div>
+      <p id={feedbackHintId} className="tetro-about-feedback-hint">Opens GitHub. Posts are public and require an account.</p>
     </> : tab === 'privacy' ? <dl className="tetro-privacy">{PRIVACY.map(([term, text]) => <div key={term}><dt>{term}</dt><dd>{text}</dd></div>)}</dl>
     : <div className="tetro-license-text"><pre>{licenses ? reflowLicenseText(licenses) : 'Loading notices…'}</pre></div>}</div>
   </div>;

@@ -326,7 +326,7 @@ mod tests {
         for name in ["Sarah", "Mark", "Emily", "Italy"] { assert!(!json.contains(name), "Invented detail: {name}"); }
         println!("LIVE TEMPLATE:\n{json}");
         let source = "It is good to see you again. We have not spoken for a while, so I wanted to say hello and hear how you are doing. Thanks for calling. I am happy to hear from you too. That is all I wanted to say today.";
-        let output = generate_meeting_summary(&client, &LLMProvider::BuiltInAI, "qwen3.5:2b", "", source, "", "friends", &draft, 1748, None, None, Some(800), None, None, Some(&dir), None, Some("en"), Some("en"), None).await.unwrap();
+        let output = generate_meeting_summary(&client, &LLMProvider::BuiltInAI, "qwen3.5:2b", "", source, "", "friends", &draft, 1748, None, None, Some(800), None, None, Some(&dir), None, Some("en"), Some("en"), None, |_| async { Ok(()) }).await.unwrap();
         println!("LIVE SUMMARY:\n{}", output.final_markdown);
         for name in ["Sarah", "Mark", "Emily", "Italy", "project", "travel", "productive"] { assert!(!output.final_markdown.contains(name), "Invented detail: {name}"); }
         assert!(["greet", "hello", "happy", "see"].iter().any(|word| output.final_markdown.to_lowercase().contains(word)), "Must describe the recorded greeting, not just an empty template");
