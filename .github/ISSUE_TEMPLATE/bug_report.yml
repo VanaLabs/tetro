@@ -1,0 +1,43 @@
+name: Report a bug
+description: Tell us what happened and how to reproduce it.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This post will be public. Please leave out recordings, transcripts and private information. You can reply to follow-up questions here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the problem you encountered.
+    validations:
+      required: true
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Other / not sure
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: Tetro version
+      description: You can find this in About Tetro. Leave it blank if you are not sure.
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we reproduce it?
+      description: Include numbered steps if you know how to make it happen again.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots can help. Check them for private content before attaching them.
